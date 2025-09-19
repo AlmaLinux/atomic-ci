@@ -114,6 +114,7 @@ env:
   IMAGE_REGISTRY: ${{ inputs.REGISTRY }}
   IMAGE_PATH: ${{ inputs.image-path }}
   SIGNING_ENABLED: ${{ (secrets.SIGNING_SECRET != null && secrets.SIGNING_SECRET != '') || inputs.KMS_KEY_ALIAS != '' }}
+  INTERNAL_ACTIONS_REF: sbom
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-${{ inputs.image-name }}
@@ -134,7 +135,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           repository: AlmaLinux/atomic-ci
-          ref: 'main'
+          ref: ${{ env.INTERNAL_ACTIONS_REF }}
           path: github-actions
 
       - uses: ./github-actions/.github/actions/prepare-build
@@ -175,7 +176,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           repository: AlmaLinux/atomic-ci
-          ref: 'main'
+          ref: ${{ env.INTERNAL_ACTIONS_REF }}
           path: github-actions
 
       - uses: ./github-actions/.github/actions/build
@@ -238,7 +239,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           repository: AlmaLinux/atomic-ci
-          ref: 'main'
+          ref: ${{ env.INTERNAL_ACTIONS_REF }}
           path: github-actions
 
       - uses: ./github-actions/.github/actions/manifest

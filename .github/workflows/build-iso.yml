@@ -87,6 +87,9 @@ on:
         description: "The AWS role ARN to assume for AWS S3 uploads"
         required: false
 
+env:
+  INTERNAL_ACTIONS_REF: sbom
+
 jobs:
   generate_matrix:
     runs-on: ubuntu-latest
@@ -125,7 +128,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4
         with:
           repository: AlmaLinux/atomic-ci
-          ref: 'main'
+          ref: ${{ env.INTERNAL_ACTIONS_REF }}
           path: github-actions
 
       - name: Build ISO
