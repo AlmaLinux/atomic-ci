@@ -88,7 +88,7 @@ on:
         required: false
 
 env:
-  INTERNAL_ACTIONS_REF: sbom
+  INTERNAL_ACTIONS_REF: v9
 
 jobs:
   generate_matrix:
