@@ -27,6 +27,37 @@ runs:
       with:
         remove-codeql: true
 
+    # Add a swapfile to help with memory-intensive SBOM generation
+    # Copied from https://github.com/m2Giles/m2os/blob/3c7bd6faf6637dd99d6d34ffd177859e23c0945f/.github/workflows/gen-sbom.yml#L73-L99
+    - name: Setup
+      id: mkswap
+      shell: bash
+      run: |
+        set -eou pipefail
+        echo "=== FREE SPACE ==="
+        df -h
+        echo "=== MEMORY AND SWAP ==="
+        free -h
+        swapon --show
+        echo "=== MAKING SWAPFILE ==="
+        sudo swapoff /mnt/swapfile
+        sudo rm -f /mnt/swapfile
+        SWAP_FILE="/mnt/swapfile"
+        SWAP_FILE_2="/swapfile"
+        sudo fallocate -l 70G "$SWAP_FILE"
+        sudo fallocate -l 16G "$SWAP_FILE_2"
+        sudo chmod 600 "$SWAP_FILE"
+        sudo chmod 600 "$SWAP_FILE_2"
+        sudo mkswap "$SWAP_FILE"
+        sudo mkswap "$SWAP_FILE_2"
+        sudo swapon "$SWAP_FILE"
+        sudo swapon "$SWAP_FILE_2"
+        echo "=== FREE SPACE ==="
+        df -h
+        echo "=== MEMORY AND SWAP ==="
+        free -h
+        swapon --show
+
     - name: Setup Syft
       id: setup-syft
       uses: anchore/sbom-action/download-syft@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0
