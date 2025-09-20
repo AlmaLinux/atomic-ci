@@ -5,11 +5,18 @@ inputs:
   image-ref:
     description: The reference to the image for which the SBOM will be generated
     required: true
+  artifact-name:
+    description: The name to use for the uploaded SBOM artifact (without extension)
+    required: false
+    default: sbom
 
 outputs:
   sbom-path:
     description: The path to the generated SBOM file
     value: ${{ steps.generate-sbom.outputs.OUTPUT_PATH }}
+  artifact-name:
+    description: The name of the uploaded SBOM artifact (with extension)
+    value: ${{ steps.generate-sbom.outputs.ARTIFACT_NAME }}
 
 runs:
   using: "composite"
@@ -30,7 +37,22 @@ runs:
         SYFT_CMD: ${{ steps.setup-syft.outputs.cmd }}
       shell: bash
       run: |
-        OUTPUT_PATH="$(mktemp -d)/sbom.json"
+        NAME=${{ inputs.artifact-name }}
+        # Remove consecutive dashes (when there's no variant, for example)
+        NAME=${NAME//--/-}
+        # Set ARTIFACT_NAME for use in artifact upload (replace / with _)
+        echo "ARTIFACT_NAME=${NAME//\//_}.spdx.json" >> "$GITHUB_OUTPUT"
+
+        OUTPUT_PATH="$(mktemp -d)/${NAME//\//_}.spdx.json"
         export SYFT_PARALLELISM=$(($(nproc)*2))
         $SYFT_CMD ${{ inputs.image-ref }} --select-catalogers "rpm,+sbom-cataloger" -o spdx-json=${OUTPUT_PATH}
         echo "OUTPUT_PATH=${OUTPUT_PATH}" >> $GITHUB_OUTPUT
+
+    - name: Upload SBOM to Job Artifacts
+      id: upload-sbom
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: ${{ steps.generate-sbom.outputs.ARTIFACT_NAME }}
+        path: ${{ steps.generate-sbom.outputs.OUTPUT_PATH }}
+        if-no-files-found: error
+        compression-level: 9

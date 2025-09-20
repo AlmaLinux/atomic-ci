@@ -27,11 +27,20 @@ jobs:
 
     steps:
       - name: Fetch Changelogs
+        id: download-changelogs
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4
         with:
           pattern: changelog-${{ inputs.image-name }}-*
           merge-multiple: true
           path: /tmp/changelogs
+
+      - name: Fetch SBOMs
+        id: download-sbom
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4
+        with:
+          pattern: "*.spdx.json"
+          merge-multiple: true
+          path: /tmp/sboms
 
       - name: Prepare Release
         id: prepare-release
@@ -39,7 +48,7 @@ jobs:
         run: |
           echo "Automated release for ${{ inputs.image-name }} version \`${{ inputs.version }}\`." > ./changelog.md
 
-          for changelog in /tmp/changelogs/*.txt; do
+          for changelog in ${{ steps.download-changelogs.outputs.download-path }}/*.txt; do
             # Remove empty Package Changes
             sed -i '/^#### Package Changes$/{
             N
@@ -83,3 +92,4 @@ jobs:
           tag_name: ${{ inputs.version }}
           body_path: ./changelog.md
           make_latest: true
+          files: "${{ steps.download-sbom.outputs.download-path }}/*.spdx.json"

@@ -44,7 +44,7 @@ runs:
       run: |
         cd "$(dirname "$SBOM_OUTPUT")"
         cosign attest --yes \
-          --predicate ./sbom.json \
+          --predicate ./*.spdx.json \
           --type spdxjson \
           --key env://COSIGN_PRIVATE_KEY \
           ${{ inputs.image-ref }}
@@ -73,7 +73,7 @@ runs:
       run: |
         cd "$(dirname "$SBOM_OUTPUT")"
         cosign attest --yes \
-          --predicate ./sbom.json \
+          --predicate ./*.spdx.json \
           --type spdxjson \
           --key awskms:///alias/${{ inputs.KMS_KEY_ALIAS }} \
           ${{ inputs.image-ref }}
