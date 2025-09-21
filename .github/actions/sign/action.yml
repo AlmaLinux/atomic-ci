@@ -35,19 +35,20 @@ runs:
       shell: bash
       run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${{ inputs.image-ref }}
 
-    - name: SBOM Attestation with Signing Secret
-      if: ${{ inputs.signing-secret != '' && inputs.sbom-path != '' }}
-      env:
-        COSIGN_PRIVATE_KEY: ${{ inputs.signing-secret }}
-        SBOM_OUTPUT: ${{ inputs.sbom-path }}
-      shell: bash
-      run: |
-        cd "$(dirname "$SBOM_OUTPUT")"
-        cosign attest --yes \
-          --predicate ./*.spdx.json \
-          --type spdxjson \
-          --key env://COSIGN_PRIVATE_KEY \
-          ${{ inputs.image-ref }}
+    # - name: SBOM Attestation with Signing Secret
+    #   if: ${{ inputs.signing-secret != '' && inputs.sbom-path != '' }}
+    #   env:
+    #     COSIGN_PRIVATE_KEY: ${{ inputs.signing-secret }}
+    #     SBOM_OUTPUT: ${{ inputs.sbom-path }}
+    #   shell: bash
+    #   run: |
+    #     cd "$(dirname "$SBOM_OUTPUT")"
+    #     cosign attest --yes \
+    #       --tlog-upload=false \
+    #       --predicate ./*.spdx.json \
+    #       --type spdxjson \
+    #       --key env://COSIGN_PRIVATE_KEY \
+    #       ${{ inputs.image-ref }}
 
     - name: Configure AWS credentials
       if: ${{ inputs.AWS_ROLE_ARN != '' && inputs.AWS_REGION != '' && inputs.KMS_KEY_ALIAS != '' }}
@@ -65,16 +66,16 @@ runs:
       shell: bash
       run: cosign sign --yes --key awskms:///alias/${{ inputs.KMS_KEY_ALIAS }} ${{ inputs.image-ref }}
 
-    - name: SBOM Attestation with KMS
-      if: ${{ env.AWS_SESSION_TOKEN != '' && inputs.sbom-path != '' }}
-      env:
-        SBOM_OUTPUT: ${{ inputs.sbom-path }}
-      shell: bash
-      run: |
-        cd "$(dirname "$SBOM_OUTPUT")"
-        cosign attest --yes --verbose \
-          --tlog-upload=false \
-          --predicate ./*.spdx.json \
-          --type spdxjson \
-          --key awskms:///alias/${{ inputs.KMS_KEY_ALIAS }} \
-          ${{ inputs.image-ref }}
+    # - name: SBOM Attestation with KMS
+    #   if: ${{ env.AWS_SESSION_TOKEN != '' && inputs.sbom-path != '' }}
+    #   env:
+    #     SBOM_OUTPUT: ${{ inputs.sbom-path }}
+    #   shell: bash
+    #   run: |
+    #     cd "$(dirname "$SBOM_OUTPUT")"
+    #     cosign attest --yes --verbose \
+    #       --tlog-upload=false \
+    #       --predicate ./*.spdx.json \
+    #       --type spdxjson \
+    #       --key awskms:///alias/${{ inputs.KMS_KEY_ALIAS }} \
+    #       ${{ inputs.image-ref }}
