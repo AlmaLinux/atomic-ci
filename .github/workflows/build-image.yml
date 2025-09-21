@@ -191,6 +191,7 @@ jobs:
           image-tag: ${{ needs.generate_matrix.outputs.tag }}
           skip-maximize-build-space: ${{ inputs.skip-maximize-build-space }}
           docs-url: ${{ inputs.docs-url }}
+          changelog-snippet: ${{ inputs.changelog-snippet }}
           image-description: ${{ inputs.image-description }}
           previous-image: ${{ inputs.previous-image }}
           REGISTRY: ${{ inputs.REGISTRY }}
