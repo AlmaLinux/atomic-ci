@@ -42,6 +42,15 @@ jobs:
           merge-multiple: true
           path: /tmp/sboms
 
+      - name: Compress SBOMs
+        id: compress-sbom
+        shell: bash
+        run: |
+          cd ${{ steps.download-sbom.outputs.download-path }}
+          for f in *.spdx.json; do
+            gzip -9 "$f"
+          done
+
       - name: Prepare Release
         id: prepare-release
         shell: bash
@@ -92,4 +101,4 @@ jobs:
           tag_name: ${{ inputs.version }}
           body_path: ./changelog.md
           make_latest: true
-          files: "${{ steps.download-sbom.outputs.download-path }}/*.spdx.json"
+          files: "${{ steps.download-sbom.outputs.download-path }}/*.spdx.json.gz"
