@@ -72,7 +72,7 @@ runs:
       shell: bash
       run: |
         cd "$(dirname "$SBOM_OUTPUT")"
-        cosign attest --yes \
+        cosign attest --yes -d \
           --predicate ./*.spdx.json \
           --type spdxjson \
           --key awskms:///alias/${{ inputs.KMS_KEY_ALIAS }} \
