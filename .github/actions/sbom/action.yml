@@ -81,7 +81,7 @@ runs:
 
     - name: Upload SBOM to Job Artifacts
       id: upload-sbom
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v4
       with:
         name: ${{ steps.generate-sbom.outputs.ARTIFACT_NAME }}
         path: ${{ steps.generate-sbom.outputs.OUTPUT_PATH }}
