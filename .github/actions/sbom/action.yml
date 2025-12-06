@@ -23,9 +23,9 @@ runs:
   steps:
     # SBOM generation is pretty heavy, make some room
     - name: Maximize build space
-      uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
+      uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6 # v10 when it gets tagged
       with:
-        remove-codeql: true
+        extra-squeeze: false
 
     # Add a swapfile to help with memory-intensive SBOM generation
     # Copied from https://github.com/m2Giles/m2os/blob/3c7bd6faf6637dd99d6d34ffd177859e23c0945f/.github/workflows/gen-sbom.yml#L73-L99
