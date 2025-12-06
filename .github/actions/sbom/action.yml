@@ -40,8 +40,11 @@ runs:
         free -h
         swapon --show
         echo "=== MAKING SWAPFILE ==="
-        sudo swapoff /mnt/swapfile
-        sudo rm -f /mnt/swapfile
+        SWAPS=$(grep -v Filename /proc/swaps | awk '{print $1}')
+        sudo swapoff -a
+        for SWAP in $SWAPS; do
+            sudo rm -f "$SWAP"
+        done
         SWAP_FILE="/mnt/swapfile"
         SWAP_FILE_2="/swapfile"
         sudo fallocate -l 70G "$SWAP_FILE"
