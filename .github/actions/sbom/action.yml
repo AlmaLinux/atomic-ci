@@ -40,7 +40,7 @@ runs:
         free -h
         swapon --show
         echo "=== MAKING SWAPFILE ==="
-        SWAPS=$(grep -v Filename /proc/swaps | awk '{print $1}')
+        SWAPS=$(grep -v Filename /proc/swaps | awk '{print $1}' || true)
         sudo swapoff -a
         for SWAP in $SWAPS; do
             sudo rm -f "$SWAP"
