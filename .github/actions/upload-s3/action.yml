@@ -30,7 +30,7 @@ runs:
     - name: Configure AWS credentials
       if: ${{ inputs.AWS_ROLE_ARN != '' && inputs.aws-default-region != '' }}
       id: configure-aws
-      uses: aws-actions/configure-aws-credentials@v5
+      uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ inputs.AWS_ROLE_ARN }}
         role-session-name: almalinux-bootc-s3-${{ github.run_id }}
