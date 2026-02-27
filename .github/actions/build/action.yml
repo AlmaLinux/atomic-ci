@@ -197,7 +197,7 @@ runs:
           <pkgupd>
 
     - name: Upload ChangeLog
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
       with:
         name: changelog-${{ inputs.image-name }}-${{ env.CLEAN_ARCH }}
         retention-days: 1
@@ -270,7 +270,7 @@ runs:
         echo "::endgroup::"
 
     - name: Upload Output Artifacts
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
       with:
         name: ${{ inputs.image-name }}_${{ env.CLEAN_ARCH }}
         retention-days: 1
