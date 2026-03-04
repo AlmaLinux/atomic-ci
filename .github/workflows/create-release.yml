@@ -46,7 +46,7 @@ jobs:
         id: compress-sbom
         shell: bash
         run: |
-          cd ${{ steps.download-sbom.outputs.download-path }}
+          mkdir -p "${{ steps.download-sbom.outputs.download-path }}" && cd $_
           for f in *.spdx.json; do
             gzip -9 "$f"
           done
