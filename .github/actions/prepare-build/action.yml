@@ -57,10 +57,15 @@ runs:
         # Extract the last FROM image using Python
         upstream=$(python3 - << 'EOF'
         from dockerfile_parse import DockerfileParser
+        from dockerfile_parse.parser import image_from
         with open("${{ inputs.containerfile }}", "r") as f:
             dfp = DockerfileParser(fileobj=f)
-            froms = [s['value'].split()[0] for s in dfp.structure if s['instruction'] == 'FROM']
-            print(froms[-1])
+            froms = [image_from(s['value']) for s in dfp.structure if s['instruction'] == 'FROM']
+            upstream = froms[-1][0]
+            for image, name in reversed(froms):
+                if name == upstream:
+                    upstream = image
+            print(upstream)
         EOF
         )
         echo "upstream-image=$upstream" >> $GITHUB_OUTPUT
