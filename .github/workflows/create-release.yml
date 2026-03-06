@@ -48,7 +48,7 @@ jobs:
         run: |
           mkdir -p "${{ steps.download-sbom.outputs.download-path }}" && cd $_
           for f in *.spdx.json; do
-            gzip -9 "$f"
+            gzip -9 "$f" || true
           done
 
       - name: Prepare Release
