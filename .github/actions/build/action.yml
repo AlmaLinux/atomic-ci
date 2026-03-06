@@ -7,10 +7,19 @@ inputs:
     required: true
   variant:
     description: The variant of the image to build
-    required: true
+    required: false
+    default: ""
   containerfile:
     description: The path to the Containerfile used for building the image
     required: true
+  stage:
+    description: The stage to build in the Containerfile
+    required: false
+    default: ""
+  extra-args:
+    description: Additional arguments to pass to the podman build command
+    required: false
+    default: ""
   image-name:
     description: The name of the image to build
     required: true
@@ -99,6 +108,8 @@ runs:
       shell: bash
       env:
         IMAGE_TAG: ${{ inputs.image-tag }}-${{ env.CLEAN_ARCH }}
+        STAGE_ARGS: --target=${{ inputs.stage }}
+        EXTRA_ARGS: ${{ inputs.extra-args }}
       run: |
         echo "::group::Build Image"
         sudo podman build \
@@ -113,6 +124,8 @@ runs:
           --build-arg VARIANT=${{ inputs.variant }} \
           -t ${{ inputs.image-name }}:${IMAGE_TAG} \
           -f ${{ inputs.containerfile }} \
+          ${{ env.STAGE_ARGS }} \
+          ${{ env.EXTRA_ARGS }} \
           .
 
         echo "image-id=$(cat /tmp/image-id)" >> $GITHUB_OUTPUT

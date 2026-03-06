@@ -6,6 +6,14 @@ on:
         description: "The path to the Containerfile"
         required: true
         type: string
+      stage:
+        description: The stage to build in the Containerfile
+        required: false
+        type: string
+      extra-args:
+        description: Additional arguments to pass to the podman build command
+        required: false
+        type: string
       image-name:
         description: "The name of the image to build"
         required: true
@@ -197,6 +205,8 @@ jobs:
           platform: ${{ matrix.platform }}
           variant: ${{ inputs.variant }}
           containerfile: ${{ inputs.containerfile }}
+          stage: ${{ inputs.stage }}
+          extra-args: ${{ inputs.extra-args }}
           image-name: ${{ inputs.image-name }}
           image-path: ${{ inputs.image-path }}
           image-tag: ${{ needs.generate_matrix.outputs.tag }}
@@ -228,7 +238,6 @@ jobs:
           KMS_KEY_ALIAS: ${{ inputs.KMS_KEY_ALIAS }}
           AWS_REGION: ${{ inputs.AWS_REGION }}
           AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-
 
   manifest:
     name: Create Manifest
