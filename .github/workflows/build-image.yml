@@ -81,6 +81,16 @@ on:
         description: "The AWS region to use for signing the image"
         required: false
         type: string
+      INTERNAL_ACTIONS_REPO:
+        description: "The repository that contains the internal actions used in this workflow"
+        required: false
+        type: string
+        default: AlmaLinux/atomic-ci
+      INTERNAL_ACTIONS_REF:
+        description: "The ref to use for the internal actions repository"
+        required: false
+        type: string
+        default: v11
     outputs:
       image-ref:
         description: "The image reference of the built image"
@@ -114,7 +124,8 @@ env:
   IMAGE_REGISTRY: ${{ inputs.REGISTRY }}
   IMAGE_PATH: ${{ inputs.image-path }}
   SIGNING_ENABLED: ${{ (secrets.SIGNING_SECRET != null && secrets.SIGNING_SECRET != '') || inputs.KMS_KEY_ALIAS != '' }}
-  INTERNAL_ACTIONS_REF: v11
+  INTERNAL_ACTIONS_REPO: ${{ inputs.INTERNAL_ACTIONS_REPO }}
+  INTERNAL_ACTIONS_REF: ${{ inputs.INTERNAL_ACTIONS_REF }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-${{ inputs.image-name }}
@@ -134,7 +145,7 @@ jobs:
       - name: Checkout github actions
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
-          repository: AlmaLinux/atomic-ci
+          repository: ${{ env.INTERNAL_ACTIONS_REPO }}
           ref: ${{ env.INTERNAL_ACTIONS_REF }}
           path: github-actions
 
@@ -175,7 +186,7 @@ jobs:
       - name: Checkout github actions
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
-          repository: AlmaLinux/atomic-ci
+          repository: ${{ env.INTERNAL_ACTIONS_REPO }}
           ref: ${{ env.INTERNAL_ACTIONS_REF }}
           path: github-actions
 
@@ -240,7 +251,7 @@ jobs:
       - name: Checkout github actions
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
-          repository: AlmaLinux/atomic-ci
+          repository: ${{ env.INTERNAL_ACTIONS_REPO }}
           ref: ${{ env.INTERNAL_ACTIONS_REF }}
           path: github-actions
 
