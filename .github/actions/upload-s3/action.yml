@@ -6,17 +6,12 @@ inputs:
     description: "The directory containing the files to upload"
     required: true
   bucket:
-    description: "The Cloudflare R2 bucket to upload the files to"
+    description: "The Amazon S3 bucket to upload the files to"
     required: true
   path:
-    description: "The path to the files to upload, relative to the directory"
+    description: "The path to the files to upload, relative to the bucket root"
     required: true
-  iso-name:
-    description: "The name of the ISO file to upload"
-    required: true
-  checksum-name:
-    description: "The name of the checksum file to upload"
-    required: true
+    default: ""
   aws-default-region:
     description: "The AWS region to use for S3 uploads"
     required: true
@@ -46,18 +41,4 @@ runs:
         # Upload the files to S3 bucket
         aws s3 cp ${{ inputs.directory }} \
             s3://${BUCKET}/${{ inputs.path }}/ \
-            --recursive
-
-          # Make them uploaded file publicly available
-        aws s3api put-object-tagging \
-            --bucket ${BUCKET} \
-            --key ${{ inputs.path }}/${{ inputs.iso-name }} \
-            --tagging 'TagSet={Key=public,Value=yes}'
-
-        aws s3api put-object-tagging \
-            --bucket ${BUCKET} \
-            --key ${{ inputs.path }}/${{ inputs.checksum-name }} \
-            --tagging 'TagSet={Key=public,Value=yes}'
-
-        echo "ISO: https://${BUCKET}.s3-accelerate.dualstack.amazonaws.com/${{ inputs.path }}/${{ inputs.iso-name }}" >> $GITHUB_STEP_SUMMARY
-        echo "Digest: https://${BUCKET}.s3-accelerate.dualstack.amazonaws.com/${{ inputs.path }}/${{ inputs.checksum-name }}" >> $GITHUB_STEP_SUMMARY
+            --recursive --acl public-read
