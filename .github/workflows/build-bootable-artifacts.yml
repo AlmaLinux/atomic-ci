@@ -1,4 +1,4 @@
-name: Build ISO
+name: Build bootable artifacts
 on:
   workflow_call:
     inputs:
@@ -7,9 +7,14 @@ on:
         required: true
         type: string
       image-name:
-        description: "Name of the image, will be used to name the file name ISO"
+        description: "Name of the image, will be used to name the artifact files"
         required: true
         type: string
+      image-types:
+        description: "The types of bootable artifacts to build (ie: iso,raw)"
+        required: false
+        type: string
+        default: "iso"
       update_origin_ref:
         description: "Image reference to update from (ie: {image}:latest)"
         required: false
@@ -20,7 +25,7 @@ on:
         type: boolean
         default: true
       config-file:
-        description: "Path to the ISO configuration file"
+        description: "Path to the bootable artifacts configuration file"
         required: true
         type: string
       platforms:
@@ -28,11 +33,15 @@ on:
         required: false
         type: string
         default: "amd64,arm64"
-      use_librepo:
+      use-librepo:
         description: "Use librepo to download the image"
         required: false
         type: boolean
         default: false
+      additional-args:
+        description: "Additional arguments to pass to the bootc-image-builder"
+        required: false
+        type: string
       REGISTRY_USER:
         description: "The username to use for the registry"
         required: false
@@ -44,32 +53,42 @@ on:
         type: string
         default: "ghcr.io"
       upload-to-github:
-        description: "Upload the ISO to GitHub Actions artifacts"
+        description: "Upload the artifacts to GitHub Actions artifacts"
         required: false
         type: boolean
         default: true
       upload-to-cloudflare:
-        description: "Upload the ISO to Cloudflare"
+        description: "Upload the artifacts to Cloudflare"
         required: false
         type: boolean
         default: false
       upload-to-s3:
-        description: "Upload the ISO to S3"
+        description: "Upload the artifacts to S3"
         required: false
         type: boolean
         default: false
-      s3-path:
-        description: "The path to upload the ISO to in S3"
+      bucket:
+        description: "The S3/R2 bucket to upload the artifacts to"
         required: false
         type: string
-      bucket:
-        description: "The S3/R2 bucket to upload the ISO to"
+      path:
+        description: "The path to upload the artifacts to in S3/R2"
         required: false
         type: string
       aws-default-region:
         description: "The AWS region to use for S3 uploads"
         required: false
         type: string
+      INTERNAL_ACTIONS_REPO:
+        description: "The repository that contains the internal actions used in this workflow"
+        required: false
+        type: string
+        default: AlmaLinux/atomic-ci
+      INTERNAL_ACTIONS_REF:
+        description: "The ref to use for the internal actions repository"
+        required: false
+        type: string
+        default: v11
     secrets:
       REGISTRY_TOKEN:
         description: "The token to use for the registry"
@@ -88,7 +107,8 @@ on:
         required: false
 
 env:
-  INTERNAL_ACTIONS_REF: v11
+  INTERNAL_ACTIONS_REPO: ${{ inputs.INTERNAL_ACTIONS_REPO }}
+  INTERNAL_ACTIONS_REF: ${{ inputs.INTERNAL_ACTIONS_REF }}
 
 jobs:
   generate_matrix:
@@ -109,7 +129,7 @@ jobs:
           done
           echo "matrix=$(echo $MATRIX | jq -c '.')" >> $GITHUB_OUTPUT
 
-  build-iso:
+  build-bootable-artifacts:
     runs-on: ${{ matrix.platform == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     needs: generate_matrix
     strategy:
@@ -127,21 +147,23 @@ jobs:
       - name: Checkout github actions
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
-          repository: AlmaLinux/atomic-ci
+          repository: ${{ env.INTERNAL_ACTIONS_REPO }}
           ref: ${{ env.INTERNAL_ACTIONS_REF }}
           path: github-actions
 
-      - name: Build ISO
-        id: build-iso
-        uses: ./github-actions/.github/actions/build-iso
+      - name: Build bootable artifacts
+        id: build-bootable-artifacts
+        uses: ./github-actions/.github/actions/build-bootable-artifacts
         with:
           image: ${{ inputs.image }}
           image-name: ${{ inputs.image-name }}
+          image-types: ${{ inputs.image-types }}
           update_origin_ref: ${{ inputs.update_origin_ref }}
           update_is_signed: ${{ inputs.update_is_signed }}
           config-file: ${{ inputs.config-file }}
           platform: ${{ matrix.platform }}
-          use_librepo: ${{ inputs.use_librepo }}
+          use-librepo: ${{ inputs.use-librepo }}
+          additional-args: ${{ inputs.additional-args }}
           REGISTRY: ${{ inputs.REGISTRY }}
           REGISTRY_USER: ${{ inputs.REGISTRY_USER }}
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
@@ -150,15 +172,16 @@ jobs:
         if: inputs.upload-to-github == true
         uses: ./github-actions/.github/actions/upload-gh
         with:
-          artifact_name: ${{ steps.build-iso.outputs.artifact_name }}
-          directory: ${{ steps.build-iso.outputs.output_directory }}
+          artifact_basename: ${{ steps.build-bootable-artifacts.outputs.artifact_basename }}
+          directory: ${{ steps.build-bootable-artifacts.outputs.output_directory }}
 
       - name: Upload to Cloudflare
         if: inputs.upload-to-cloudflare == true
         uses: ./github-actions/.github/actions/upload-r2
         with:
-          directory: ${{ steps.build-iso.outputs.output_directory }}
+          directory: ${{ steps.build-bootable-artifacts.outputs.output_directory }}
           bucket: ${{ inputs.bucket }}
+          path: ${{ inputs.path }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS_KEY }}
@@ -167,10 +190,8 @@ jobs:
         if: inputs.upload-to-s3 == true
         uses: ./github-actions/.github/actions/upload-s3
         with:
-          directory: ${{ steps.build-iso.outputs.output_directory }}
+          directory: ${{ steps.build-bootable-artifacts.outputs.output_directory }}
           bucket: ${{ inputs.bucket }}
-          path: ${{ inputs.s3-path }}
+          path: ${{ inputs.path }}
           aws-default-region: ${{ inputs.aws-default-region }}
-          iso-name: ${{ steps.build-iso.outputs.iso_name }}
-          checksum-name: ${{ steps.build-iso.outputs.checksum_name }}
           AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
