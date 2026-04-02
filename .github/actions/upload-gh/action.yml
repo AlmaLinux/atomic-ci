@@ -2,8 +2,8 @@
 name: Upload to GitHub Actions Artifacts
 
 inputs:
-  artifact_name:
-    description: "The name of the artifact to upload"
+  artifact_basename:
+    description: "The basename of the artifacts to upload"
     required: true
   directory:
     description: "The directory containing the files to upload"
@@ -12,11 +12,11 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Upload ISOs and Checksum to Job Artifacts
+    - name: Upload Bootable Artifacts and Checksums to Job Artifacts
       id: upload-gh
       uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
       with:
-        name: ${{ inputs.artifact_name }}
+        name: ${{ inputs.artifact_basename }}
         path: ${{ inputs.directory }}
         if-no-files-found: error
         compression-level: 0
@@ -26,5 +26,5 @@ runs:
     - name: Summary
       shell: bash
       run: |
-        echo "Artifact URL: ${{ steps.upload-gh.outputs.artifact-url }}" >> $GITHUB_STEP_SUMMARY
+        echo "Artifact: ${{ steps.upload-gh.outputs.artifact-url }}" >> $GITHUB_STEP_SUMMARY
         echo "Digest: ${{ steps.upload-gh.outputs.artifact-digest }}" >> $GITHUB_STEP_SUMMARY
