@@ -1,5 +1,5 @@
 ---
-name: Build ISO
+name: Build bootable artifacts
 
 inputs:
   platform:
@@ -9,8 +9,12 @@ inputs:
     description: Full podman image reference, including hash (e.g., "registry.example.com/image@sha256")
     required: true
   image-name:
-    description: Name of the image, will be used to name the ISO file (e.g., "my-image")
+    description: Name of the image, will be used to name the artifact files (e.g., "my-image")
     required: true
+  image-types:
+    description: The types of bootable artifacts to build (e.g., "iso,raw")
+    required: false
+    default: "iso"
   update_is_signed:
     description: Whether the image is signed or not
     required: false
@@ -18,10 +22,13 @@ inputs:
     description: Image reference to update from (e.g., "{image}:latest")
     required: true
   config-file:
-    description: Path to the ISO configuration file
+    description: Path to the bootable artifacts configuration file
     required: true
-  use_librepo:
+  use-librepo:
     description: "Use librepo to download the image"
+    required: false
+  additional-args:
+    description: "Additional arguments to pass to the bootc-image-builder"
     required: false
   REGISTRY:
     description: The container registry URL (e.g., "registry.example.com")
@@ -35,17 +42,11 @@ inputs:
 
 outputs:
   output_directory:
-    description: The directory where the built ISO and checksum are stored
+    description: The directory where the built artifacts and checksums are stored
     value: ${{ steps.rename.outputs.output_directory }}
-  artifact_name:
-    description: The name of the artifact (ISO file) without the extension
-    value: ${{ steps.rename.outputs.ARTIFACT_NAME }}
-  iso_name:
-    description: The name of the built ISO file
-    value: ${{ steps.rename.outputs.ISO_NAME }}
-  checksum_name:
-    description: The name of the checksum file for the ISO
-    value: ${{ steps.rename.outputs.CHECKSUM_NAME }}
+  artifact_basename:
+    description: The base name of the artifacts
+    value: ${{ steps.rename.outputs.artifact_basename }}
 
 runs:
   using: "composite"
@@ -64,7 +65,7 @@ runs:
         ARCH=${{ inputs.platform }}
         echo "CLEAN_ARCH=${ARCH//\//_}" >> "$GITHUB_ENV"
 
-    - name: Prepare ISO configuration
+    - name: Prepare bootable artifacts configuration
       shell: bash
       run: |
         [ "${{ inputs.update_is_signed }}" = "true" ] && SIG="--enforce-container-sigpolicy"
@@ -73,36 +74,42 @@ runs:
         sed -i "s#<IMAGE_SIGNED>#${SIG}#g" ${{ inputs.config-file }}
         cat ${{ inputs.config-file }}
 
-    - name: Build ISO
-      id: build
-      #uses: ublue-os/bootc-image-builder-action@b98784c42327746e107a6a753b64f44823bdbf2f
-      uses: alexiri/bootc-image-builder-action@platform
-      with:
-        image: ${{ inputs.image }}
-        type: iso
-        use-librepo: ${{ inputs.use_librepo }}
-        config-file: ${{ inputs.config-file }}
-        platform: linux/${{ inputs.platform }}
+        [ "${{ inputs.use-librepo }}" = "true" ] && USE_LIBREPO="True" || USE_LIBREPO="False"
+        ADDITIONAL_ARGS="--target-arch=${{ env.CLEAN_ARCH }} --use-librepo=${USE_LIBREPO} ${{ inputs.additional-args }}"
 
-    - name: Rename ISO
+        echo "ADDITIONAL_ARGS=${ADDITIONAL_ARGS}" >> "$GITHUB_ENV"
+
+    - name: Build bootable artifacts
+      id: build
+      uses: osbuild/bootc-image-builder-action@4503a3445240ffc85cccf8f57d7cab5634e351e2
+      with:
+        config-file: ${{ inputs.config-file }}
+        image: ${{ inputs.image }}
+        additional-args: ${{ env.ADDITIONAL_ARGS }}
+        types: ${{ inputs.image-types }}
+
+    - name: Rename bootable artifacts
       id: rename
       env:
-        IMAGE_NAME: ${{ inputs.image-name }}-${{ env.CLEAN_ARCH }}-live.iso
         OUTPUT_PATH: output-${{ env.CLEAN_ARCH }}
       shell: bash
       run: |
         set -x
         mkdir -p ${{ env.OUTPUT_PATH }}
         OUTPUT_DIRECTORY="$(realpath ${{ env.OUTPUT_PATH }})"
+        ARTIFACT_BASENAME="${{ inputs.image-name }}-${{ env.CLEAN_ARCH }}"
 
-        ARTIFACT_NAME="${{ inputs.image-name }}-${{ env.CLEAN_ARCH }}"
-        ISO_NAME="${ARTIFACT_NAME}.iso"
-        CHECKSUM_NAME="${ISO_NAME}-CHECKSUM"
+        echo '${{ steps.build.outputs.output-paths }}' | jq -c '.[]' | while read -r artifact; do
+          ARTIFACT_PATH=$(echo "$artifact" | jq -r '.path')
+          ARTIFACT_CHECKSUM=$(echo "$artifact" | jq -r '.checksum')
+          ARTIFACT_EXTENSION=$(echo "$ARTIFACT_PATH" | awk -F. '{print $NF}')
 
-        mv ${{ steps.build.outputs.output-path }} "${OUTPUT_DIRECTORY}/${ISO_NAME}"
-        mv ${{ steps.build.outputs.checksum-path }} "${OUTPUT_DIRECTORY}/${CHECKSUM_NAME}"
+          ARTIFACT_NAME="${ARTIFACT_BASENAME}.${ARTIFACT_EXTENSION}"
+          CHECKSUM_NAME="${ARTIFACT_NAME}-CHECKSUM"
 
-        echo "output_directory=$OUTPUT_DIRECTORY" >> "${GITHUB_OUTPUT}"
-        echo "ISO_NAME=${ISO_NAME}" >> "${GITHUB_OUTPUT}"
-        echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> "${GITHUB_OUTPUT}"
-        echo "CHECKSUM_NAME=${CHECKSUM_NAME}" >> "${GITHUB_OUTPUT}"
+          cp "$ARTIFACT_PATH" "${OUTPUT_DIRECTORY}/${ARTIFACT_NAME}"
+          echo "$ARTIFACT_CHECKSUM" > "${OUTPUT_DIRECTORY}/${CHECKSUM_NAME}"
+        done
+
+        echo "output_directory=${OUTPUT_DIRECTORY}" >> "${GITHUB_OUTPUT}"
+        echo "artifact_basename=${ARTIFACT_BASENAME}" >> "${GITHUB_OUTPUT}"
