@@ -8,6 +8,10 @@ inputs:
   bucket:
     description: "The Cloudflare R2 bucket to upload the files to"
     required: true
+  path:
+    description: "The path to the files to upload, relative to the bucket root"
+    required: true
+    default: ""
   R2_ACCOUNT_ID:
     description: "The Cloudflare R2 account ID"
     required: true
@@ -30,4 +34,4 @@ runs:
         r2-secret-access-key: ${{ inputs.R2_SECRET_ACCESS_KEY }}
         r2-bucket: ${{ inputs.bucket }}
         source-dir: ${{ inputs.directory }}
-        destination-dir: ./
+        destination-dir: ${{ inputs.path }}
