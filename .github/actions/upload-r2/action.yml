@@ -23,7 +23,7 @@ runs:
   steps:
     - name: Upload to Cloudflare
       id: upload-cf
-      uses: ryand56/r2-upload-action@b801a390acbdeb034c5e684ff5e1361c06639e7c # v1.4
+      uses: ryand56/r2-upload-action@33ebb7a494b3a8a3c5ed2ea6bbdc72e707090317 # v1.5
       with:
         r2-account-id: ${{ inputs.R2_ACCOUNT_ID }}
         r2-access-key-id: ${{ inputs.R2_ACCESS_KEY_ID }}
