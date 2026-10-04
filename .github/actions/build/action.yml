@@ -1,5 +1,6 @@
 ---
 name: Image Build Action
+description: Build and push a container image to a registry, and generate a changelog.
 
 inputs:
   platform:
@@ -134,6 +135,10 @@ runs:
         echo "version=$(echo "$INSPECT" | jq -r '.[0].Labels["org.opencontainers.image.version"]')" >> $GITHUB_OUTPUT
 
         sudo podman run --platform=linux/${{ inputs.platform }} --rm ${{ env.IMAGE_ID }} bash -c "rpm -q almalinux-gpg-keys && cat /etc/os-release"
+
+        # Package list (name -> version-release), used for the changelog and stored in the image labels
+        sudo podman run --platform=linux/${{ inputs.platform }} --rm ${{ env.IMAGE_ID }} rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\n' \
+          | jq -Rn '[inputs | split("\t") | {key: .[0], value: .[1]}] | reverse | from_entries' > /tmp/packages.json
         echo "::endgroup::"
 
     - name: Prepare previous image
@@ -143,7 +148,7 @@ runs:
         PREVIOUS_IMAGE=$(echo ${{ inputs.previous-image }} | tr '[:upper:]' '[:lower:]')
 
         # If the previous image is a multi-arch image, we need to find the digest for the current platform
-        # Rechunker won't necessarily pick the right one, so we need to do it manually
+        # skopeo won't necessarily pick the right one, so we need to do it manually
         platform=${{ inputs.platform }}
         JQ_FILTER=".manifests[] | select(.platform.architecture==\"${platform%/*}\" and "
         if [[ "$platform" = */v* ]]; then
@@ -163,38 +168,137 @@ runs:
 
         echo "PREVIOUS_IMAGE=${PREVIOUS_IMAGE}" >> $GITHUB_ENV
 
+        # Labels and tags of the previous image, used for versioning and the changelog
+        skopeo inspect docker://${PREVIOUS_IMAGE} > /tmp/previous.json || echo '{}' > /tmp/previous.json
+
+    - name: Generate changelog
+      id: changelog
+      shell: bash
+      env:
+        VERSION: ${{ steps.check.outputs.version }}
+        PRETTY: ${{ steps.check.outputs.redhat-version-id }}
+        CHANGELOG_SNIPPET: ${{ inputs.changelog-snippet }}
+        CHANGELOG: /tmp/changelog-${{ inputs.image-name }}-${{ env.CLEAN_ARCH }}.txt
+        INFO_LABEL: dev.hhd.rechunk.info # Kept from hhd-dev/rechunk, so we can compare against older images
+      run: |
+        echo "::group::Generate changelog"
+        PREV=/tmp/previous.json
+        PREV_VERSION=$(jq -r '.Labels["org.opencontainers.image.version"] // empty' $PREV)
+        PREV_REVISION=$(jq -r --arg l $INFO_LABEL '(.Labels[$l] // "{}" | fromjson | .revision) // .Labels["org.opencontainers.image.revision"] // empty' $PREV)
+        has_tag() { jq -e --arg v "$1" '(.RepoTags // []) | index($v)' $PREV > /dev/null; }
+
+        # If the previous image has the same version, suffix it with .1, .2, etc.
+        if [[ "$VERSION" == "$PREV_VERSION" ]] || has_tag "$VERSION"; then
+          if [[ ${#VERSION} -gt 3 && "${VERSION: -2:1}" == "." ]]; then
+            VERSION=${VERSION%.?}
+          fi
+          for i in {1..9}; do
+            has_tag "$VERSION.$i" || break
+          done
+          VERSION="$VERSION.$i"
+        fi
+        echo "New version: $VERSION, previous version: $PREV_VERSION"
+
+        COMMITS=""
+        if [[ -n "$PREV_REVISION" ]]; then
+          COMMITS=$(git log --format='- **%h** %s' --no-merges "$PREV_REVISION..${{ github.sha }}" || true)
+        fi
+
+        PKGUPD=$(jq -r --arg l $INFO_LABEL --slurpfile new /tmp/packages.json '
+          def ver: sub("-[^-]*$"; "");
+          (.Labels[$l] // "{}" | fromjson | .packages // {}) as $old | $new[0] as $new
+          | if $old == {} then empty else
+              ($new | to_entries[] | select($old[.key] == null) | " - **\(.key)**: x → \(.value | ver)"),
+              ($new | to_entries[] | select($old[.key] != null and $old[.key] != .value) | $old[.key] as $o
+                | if ($o | ver) != (.value | ver) then " - **\(.key)**: \($o | ver) → \(.value | ver)"
+                  else " - **\(.key)**: \($o) → \(.value)" end),
+              ($old | to_entries[] | select($new[.key] == null) | " - **\(.key)**: \(.value | ver) → x")
+            end' $PREV)
+
+        # Replace <version:pkg> and <relver:pkg> in the snippet with the package versions
+        SNIPPET=$(jq -rn --arg s "$CHANGELOG_SNIPPET" --slurpfile pkgs /tmp/packages.json '
+          reduce ($s | [scan("<(version|relver):([^>]+)>")] | unique[]) as [$kind, $name] ($s;
+            $pkgs[0][$name] as $v
+            | if $v then split("<\($kind):\($name)>") | join(if $kind == "version" then $v | sub("-[^-]*$"; "") else $v end) else . end)')
+
+        cat > $CHANGELOG <<EOF
+        ## Changelog ${{ inputs.image-name }} ${PRETTY} ${{ inputs.platform }}
+        ### Version: ${VERSION}
+        ${SNIPPET}
+
+        ### Changes since last version (${PREV_VERSION:-<previous>}):
+        #### Commits
+        ${COMMITS:--}
+
+        #### Package Changes
+        ${PKGUPD:--}
+
+        EOF
+        cat $CHANGELOG
+
+        jq -c --arg uniq "$VERSION" --arg revision "${{ github.sha }}" \
+          '{version: 2, uniq: $uniq, packages: ., revision: $revision}' /tmp/packages.json > /tmp/image-info.json
+
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "changelog=$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "::endgroup::"
+
     - name: Run Rechunker
       id: rechunk
-      uses: hhd-dev/rechunk@5fbe1d3a639615d2548d83bc888360de6267b1a2 # v1.2.4
-      with:
-        ref: ${{ steps.build.outputs.image-id }}
-        prev-ref: ${{ env.PREVIOUS_IMAGE }}
-        skip_compression: true
-        version: ${{ steps.check.outputs.version }}
-        pretty: ${{ steps.check.outputs.redhat-version-id }}
-        revision: ${{ github.sha }}
-        labels: |
-          redhat.id=${{ steps.check.outputs.redhat-id }}
-          redhat.version-id=${{ steps.check.outputs.redhat-version-id }}
-          redhat.major-version=${{ steps.check.outputs.major-version }}
-          org.opencontainers.image.created=${{ steps.build.outputs.date }}
-          org.opencontainers.image.description=${{ inputs.image-description }}
-          org.opencontainers.image.documentation=${{ inputs.docs-url }}
-          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-          org.opencontainers.image.revision=${{ github.sha }}
-          org.opencontainers.image.title=${{ inputs.image-name }}
-          org.opencontainers.image.url=${{ github.event.repository.html_url }}
-          org.opencontainers.image.vendor=${{ github.repository_owner }}
-        changelog: |
-          ## Changelog ${{ inputs.image-name }} <pretty> ${{ inputs.platform }}
-          ### Version: <version>
-          ${{ inputs.changelog-snippet }}
+      shell: bash
+      env:
+        IMAGE_ID: ${{ steps.build.outputs.image-id }}
+        IMAGE_DESCRIPTION: ${{ inputs.image-description }}
+        LABELED: localhost/${{ inputs.image-name }}:labeled
+        RECHUNKED: localhost/${{ inputs.image-name }}:rechunked
+        OUT_DIR: /tmp/rechunked
+      run: |
+        echo "::group::Label Image"
+        # bootc-base-imagectl keeps the labels of the source image, so they need to be set before rechunking
+        mkdir -p /tmp/empty-context
+        echo "FROM ${IMAGE_ID#sha256:}" | sudo podman build \
+          --platform=linux/${{ inputs.platform }} \
+          --pull=never \
+          --label "redhat.id=${{ steps.check.outputs.redhat-id }}" \
+          --label "redhat.version-id=${{ steps.check.outputs.redhat-version-id }}" \
+          --label "redhat.major-version=${{ steps.check.outputs.major-version }}" \
+          --label "org.opencontainers.image.created=${{ steps.build.outputs.date }}" \
+          --label "org.opencontainers.image.description=${IMAGE_DESCRIPTION}" \
+          --label "org.opencontainers.image.documentation=${{ inputs.docs-url }}" \
+          --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+          --label "org.opencontainers.image.revision=${{ github.sha }}" \
+          --label "org.opencontainers.image.title=${{ inputs.image-name }}" \
+          --label "org.opencontainers.image.url=${{ github.event.repository.html_url }}" \
+          --label "org.opencontainers.image.vendor=${{ github.repository_owner }}" \
+          --label "org.opencontainers.image.version=${{ steps.changelog.outputs.version }}" \
+          --label "dev.hhd.rechunk.info=$(cat /tmp/image-info.json)" \
+          -t $LABELED \
+          -f - \
+          /tmp/empty-context
+        echo "::endgroup::"
 
-          ### Changes since last version (<previous>):
-          #### Commits
-          <commits>
-          #### Package Changes
-          <pkgupd>
+        echo "::group::Rechunk Image"
+        # rpm-ostree needs /var/tmp as scratch space, which the image may not have (/var is usually emptied)
+        sudo podman run --rm \
+          --platform=linux/${{ inputs.platform }} \
+          --pull=never \
+          --privileged \
+          --security-opt=label=disable \
+          -v /var/lib/containers:/var/lib/containers \
+          -v /var/tmp:/var/tmp \
+          --entrypoint=/usr/libexec/bootc-base-imagectl \
+          $LABELED \
+          rechunk $LABELED $RECHUNKED
+
+        # Move the rechunked image out of root's storage, removing the originals to make space
+        sudo podman rmi -f $LABELED $IMAGE_ID
+        sudo skopeo copy --dest-oci-accept-uncompressed-layers containers-storage:$RECHUNKED oci:$OUT_DIR
+        sudo podman rmi $RECHUNKED
+        sudo chown $(id -u):$(id -g) -R $OUT_DIR
+
+        echo "ref=oci:$OUT_DIR" >> $GITHUB_OUTPUT
+        echo "location=$OUT_DIR" >> $GITHUB_OUTPUT
+        echo "::endgroup::"
 
     - name: Upload ChangeLog
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
@@ -203,7 +307,7 @@ runs:
         retention-days: 1
         if-no-files-found: error
         path: |
-          ${{ steps.rechunk.outputs.changelog }}
+          ${{ steps.changelog.outputs.changelog }}
 
     - name: Load Image
       id: load
@@ -212,10 +316,10 @@ runs:
       shell: bash
       run: |
         echo "::group::Load Image"
-        ls -l ${{ steps.rechunk.outputs.changelog }}
-        cat ${{ steps.rechunk.outputs.changelog }}
-        if [ -s ${{ steps.rechunk.outputs.changelog }} ]; then
-          cat ${{ steps.rechunk.outputs.changelog }} >> $GITHUB_STEP_SUMMARY
+        ls -l ${{ steps.changelog.outputs.changelog }}
+        cat ${{ steps.changelog.outputs.changelog }}
+        if [ -s ${{ steps.changelog.outputs.changelog }} ]; then
+          cat ${{ steps.changelog.outputs.changelog }} >> $GITHUB_STEP_SUMMARY
         fi
 
         IMAGE=$(podman pull ${{ steps.rechunk.outputs.ref }})
