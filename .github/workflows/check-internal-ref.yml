@@ -1,0 +1,53 @@
+name: Check internal actions ref
+on:
+  push:
+    branches:
+      - main
+      - "v*"
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check INTERNAL_ACTIONS_REF
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The reusable workflows check out the actions of this repository at INTERNAL_ACTIONS_REF,
+      # which has to be updated by hand for every release. Using a different ref can be done on
+      # purpose, so this only warns and never fails.
+      - name: Check INTERNAL_ACTIONS_REF
+        env:
+          # The release this is for: the base branch of a pull request, or the branch or tag pushed
+          RELEASE_REF: ${{ github.base_ref || github.ref_name }}
+        shell: bash
+        run: |
+          warn() {
+            echo "::warning file=$1,line=$2,title=INTERNAL_ACTIONS_REF::$3"
+            echo "- ⚠️ \`$1\`: $3" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          REFS=$(grep -Hn -E '^\s*INTERNAL_ACTIONS_REF:' .github/workflows/*.yml | sed -E 's/:\s*INTERNAL_ACTIONS_REF:\s*/:/')
+          echo "$REFS"
+
+          # All the workflows should use the same ref
+          if [[ $(echo "$REFS" | cut -d: -f3 | sort -u | wc -l) -gt 1 ]]; then
+            while IFS=: read -r file line ref; do
+              warn "$file" "$line" "Workflows use different refs for the internal actions, this one uses '$ref'"
+            done <<< "$REFS"
+          fi
+
+          # In a release branch or tag (vN), the ref should be that release
+          if [[ "$RELEASE_REF" =~ ^v[0-9]+$ ]]; then
+            while IFS=: read -r file line ref; do
+              if [[ "$ref" != "$RELEASE_REF" ]]; then
+                warn "$file" "$line" "INTERNAL_ACTIONS_REF is '$ref', but this is $RELEASE_REF. Was it forgotten?"
+              fi
+            done <<< "$REFS"
+          fi
