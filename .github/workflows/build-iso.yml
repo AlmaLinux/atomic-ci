@@ -102,10 +102,12 @@ jobs:
     steps:
       - name: Set matrix
         id: set-matrix
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
         run: |
           # turn the comma separated string into a list
           platforms=()
-          IFS=',' read -r -a platforms <<< "${{ inputs.platforms }}"
+          IFS=',' read -r -a platforms <<< "${PLATFORMS}"
 
           MATRIX="{\"include\":[]}"
           for platform in "${platforms[@]}"; do

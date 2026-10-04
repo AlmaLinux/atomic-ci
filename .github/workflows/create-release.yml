@@ -53,28 +53,32 @@ jobs:
 
       - name: Prepare Release
         id: prepare-release
+        env:
+          IMAGE_NAME: ${{ inputs.image-name }}
+          VERSION: ${{ inputs.version }}
+          LATEST_IMAGE_REF: ${{ inputs.latest-image-ref }}
         shell: bash
         run: |
-          echo "Automated release for ${{ inputs.image-name }} version \`${{ inputs.version }}\`." > ./changelog.md
+          echo "Automated release for ${IMAGE_NAME} version \`${VERSION}\`." > ./changelog.md
 
           for changelog in ${{ steps.download-changelogs.outputs.download-path }}/*.txt; do
             cat $changelog >> ./changelog.md
           done
 
-          cat <<'EOF' >> ./changelog.md
+          cat <<EOF >> ./changelog.md
           ## How to rebase
 
           If you're already using this image, upgrade with the following command:
 
-          ```bash
+          \`\`\`bash
           sudo bootc upgrade
-          ```
+          \`\`\`
 
           To switch to this image from another, type the following command in your terminal:
 
-          ```bash
-          sudo bootc switch ${{ inputs.latest-image-ref }}
-          ```
+          \`\`\`bash
+          sudo bootc switch ${LATEST_IMAGE_REF}
+          \`\`\`
           EOF
 
       - name: Create Release

@@ -42,23 +42,27 @@ runs:
       id: upload-s3
       env:
         BUCKET: ${{ inputs.bucket }}
+        DIRECTORY: ${{ inputs.directory }}
+        S3_PATH: ${{ inputs.path }}
+        ISO_NAME: ${{ inputs.iso-name }}
+        CHECKSUM_NAME: ${{ inputs.checksum-name }}
       shell: bash
       run: |-
         # Upload the files to S3 bucket
-        aws s3 cp ${{ inputs.directory }} \
-            s3://${BUCKET}/${{ inputs.path }}/ \
+        aws s3 cp "${DIRECTORY}" \
+            s3://${BUCKET}/${S3_PATH}/ \
             --recursive
 
           # Make them uploaded file publicly available
         aws s3api put-object-tagging \
             --bucket ${BUCKET} \
-            --key ${{ inputs.path }}/${{ inputs.iso-name }} \
+            --key ${S3_PATH}/${ISO_NAME} \
             --tagging 'TagSet={Key=public,Value=yes}'
 
         aws s3api put-object-tagging \
             --bucket ${BUCKET} \
-            --key ${{ inputs.path }}/${{ inputs.checksum-name }} \
+            --key ${S3_PATH}/${CHECKSUM_NAME} \
             --tagging 'TagSet={Key=public,Value=yes}'
 
-        echo "ISO: https://${BUCKET}.s3-accelerate.dualstack.amazonaws.com/${{ inputs.path }}/${{ inputs.iso-name }}" >> $GITHUB_STEP_SUMMARY
-        echo "Digest: https://${BUCKET}.s3-accelerate.dualstack.amazonaws.com/${{ inputs.path }}/${{ inputs.checksum-name }}" >> $GITHUB_STEP_SUMMARY
+        echo "ISO: https://${BUCKET}.s3-accelerate.dualstack.amazonaws.com/${S3_PATH}/${ISO_NAME}" >> $GITHUB_STEP_SUMMARY
+        echo "Digest: https://${BUCKET}.s3-accelerate.dualstack.amazonaws.com/${S3_PATH}/${CHECKSUM_NAME}" >> $GITHUB_STEP_SUMMARY

@@ -70,9 +70,11 @@ runs:
       id: generate-sbom
       env:
         SYFT_CMD: ${{ steps.setup-syft.outputs.cmd }}
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        IMAGE_REF: ${{ inputs.image-ref }}
       shell: bash
       run: |
-        NAME=${{ inputs.artifact-name }}
+        NAME=${ARTIFACT_NAME}
         # Remove consecutive dashes (when there's no variant, for example)
         NAME=${NAME//--/-}
         # Set ARTIFACT_NAME for use in artifact upload (replace / with _)
@@ -80,7 +82,7 @@ runs:
 
         OUTPUT_PATH="$(mktemp -d)/${NAME//\//_}.spdx.json"
         export SYFT_PARALLELISM=$(($(nproc)*2))
-        $SYFT_CMD ${{ inputs.image-ref }} --select-catalogers "rpm,+sbom-cataloger" -o spdx-json=${OUTPUT_PATH}
+        $SYFT_CMD "${IMAGE_REF}" --select-catalogers "rpm,+sbom-cataloger" -o spdx-json=${OUTPUT_PATH}
         echo "OUTPUT_PATH=${OUTPUT_PATH}" >> $GITHUB_OUTPUT
 
     - name: Upload SBOM to Job Artifacts

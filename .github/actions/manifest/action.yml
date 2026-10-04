@@ -81,11 +81,12 @@ runs:
       id: check
       env:
         DIGESTS_JSON: ${{ steps.load-outputs.outputs.DIGESTS_JSON }}
+        PLATFORMS: ${{ inputs.platforms }}
       shell: bash
       run: |
         # Ensure we have the digests we expected
         platforms=()
-        IFS=',' read -r -a platforms <<< "${{ inputs.platforms }}"
+        IFS=',' read -r -a platforms <<< "${PLATFORMS}"
 
         if [[ $(echo ${DIGESTS_JSON} | jq 'length') -ne ${#platforms[@]} ]]; then
           echo "Expected ${#platforms[@]} digests, found $(echo ${DIGESTS_JSON} | jq 'length')"
@@ -123,9 +124,13 @@ runs:
 
     - name: Create Manifest
       id: create-manifest
+      env:
+        REGISTRY: ${{ inputs.REGISTRY }}
+        IMAGE_PATH: ${{ inputs.image-path }}
+        IMAGE_NAME: ${{ inputs.image-name }}
       shell: bash
       run: |
-        lowercase_ref=$(echo "${{ inputs.REGISTRY }}/${{ inputs.image-path }}/${{ inputs.image-name }}" | tr '[:upper:]' '[:lower:]')
+        lowercase_ref=$(echo "${REGISTRY}/${IMAGE_PATH}/${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
         podman manifest create ${lowercase_ref}
         echo "MANIFEST=${lowercase_ref}" >> $GITHUB_OUTPUT
 

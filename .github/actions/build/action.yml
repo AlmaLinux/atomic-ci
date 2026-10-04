@@ -74,12 +74,17 @@ runs:
   steps:
     - name: Set up environment
       id: set-env
+      env:
+        PLATFORM: ${{ inputs.platform }}
+        REGISTRY: ${{ inputs.REGISTRY }}
+        IMAGE_PATH: ${{ inputs.image-path }}
+        IMAGE_NAME: ${{ inputs.image-name }}
       shell: bash
       run: |
-        ARCH=${{ inputs.platform }}
+        ARCH=${PLATFORM}
         echo "CLEAN_ARCH=${ARCH//\//_}" >> "$GITHUB_ENV"
 
-        lowercase_ref=$(echo "${{ inputs.REGISTRY }}/${{ inputs.image-path }}/${{ inputs.image-name }}" | tr '[:upper:]' '[:lower:]')
+        lowercase_ref=$(echo "${REGISTRY}/${IMAGE_PATH}/${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')
         echo "image-ref=${lowercase_ref}" >> $GITHUB_OUTPUT
 
     - name: Login to Container Registry
@@ -100,20 +105,26 @@ runs:
       shell: bash
       env:
         IMAGE_TAG: ${{ inputs.image-tag }}-${{ env.CLEAN_ARCH }}
+        PLATFORM: ${{ inputs.platform }}
+        IMAGE_NAME: ${{ inputs.image-name }}
+        REGISTRY: ${{ inputs.REGISTRY }}
+        IMAGE_PATH: ${{ inputs.image-path }}
+        VARIANT: ${{ inputs.variant }}
+        CONTAINERFILE: ${{ inputs.containerfile }}
       run: |
         echo "::group::Build Image"
         sudo podman build \
-          --platform=linux/${{ inputs.platform }} \
+          --platform=linux/${PLATFORM} \
           --security-opt=label=disable \
           --cap-add=all \
           --device /dev/fuse \
           --timestamp=0 \
           --iidfile /tmp/image-id \
-          --build-arg IMAGE_NAME=${{ inputs.image-name }} \
-          --build-arg IMAGE_REGISTRY=${{ inputs.REGISTRY }}/${{ inputs.image-path }} \
-          --build-arg VARIANT=${{ inputs.variant }} \
-          -t ${{ inputs.image-name }}:${IMAGE_TAG} \
-          -f ${{ inputs.containerfile }} \
+          --build-arg IMAGE_NAME=${IMAGE_NAME} \
+          --build-arg IMAGE_REGISTRY=${REGISTRY}/${IMAGE_PATH} \
+          --build-arg VARIANT=${VARIANT} \
+          -t ${IMAGE_NAME}:${IMAGE_TAG} \
+          -f "${CONTAINERFILE}" \
           .
 
         echo "image-id=$(cat /tmp/image-id)" >> $GITHUB_OUTPUT
@@ -125,6 +136,7 @@ runs:
       shell: bash
       env:
         IMAGE_ID: ${{ steps.build.outputs.image-id }}
+        PLATFORM: ${{ inputs.platform }}
       run: |
         echo "::group::Check Image"
         INSPECT=$(sudo podman image inspect ${{ env.IMAGE_ID }} )
@@ -134,10 +146,10 @@ runs:
         echo "major-version=$(echo "$INSPECT" | jq -r '.[0].Labels["redhat.version-id"]' | cut -d. -f1)" >> $GITHUB_OUTPUT
         echo "version=$(echo "$INSPECT" | jq -r '.[0].Labels["org.opencontainers.image.version"]')" >> $GITHUB_OUTPUT
 
-        sudo podman run --platform=linux/${{ inputs.platform }} --rm ${{ env.IMAGE_ID }} bash -c "rpm -q almalinux-gpg-keys && cat /etc/os-release"
+        sudo podman run --platform=linux/${PLATFORM} --rm ${{ env.IMAGE_ID }} bash -c "rpm -q almalinux-gpg-keys && cat /etc/os-release"
 
         # Package list (name -> version-release), used for the changelog and stored in the image labels
-        sudo podman run --platform=linux/${{ inputs.platform }} --rm ${{ env.IMAGE_ID }} rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\n' \
+        sudo podman run --platform=linux/${PLATFORM} --rm ${{ env.IMAGE_ID }} rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\n' \
           | jq -Rn '[inputs | split("\t") | {key: .[0], value: .[1]}] | reverse | from_entries' > /tmp/packages.json
         echo "::endgroup::"
 
@@ -154,13 +166,14 @@ runs:
       shell: bash
       env:
         IMAGE_ID: ${{ steps.build.outputs.image-id }}
+        PLATFORM: ${{ inputs.platform }}
       run: |
         echo "::group::Fix /usr/local symlink loop"
-        if sudo podman run --platform=linux/${{ inputs.platform }} --rm ${IMAGE_ID} bash -c '[[ "$(readlink /var/usrlocal)" == /var/usrlocal ]]'; then
+        if sudo podman run --platform=linux/${PLATFORM} --rm ${IMAGE_ID} bash -c '[[ "$(readlink /var/usrlocal)" == /var/usrlocal ]]'; then
           echo "::warning::/var/usrlocal is a symlink to itself, removing it. Update files/scripts/cleanup.sh from the respin template to fix this in your image."
           mkdir -p /tmp/empty-context
           printf 'FROM %s\nRUN rm /var/usrlocal\n' "${IMAGE_ID#sha256:}" | sudo podman build \
-            --platform=linux/${{ inputs.platform }} \
+            --platform=linux/${PLATFORM} \
             --pull=never \
             --security-opt=label=disable \
             --iidfile /tmp/image-id \
@@ -173,13 +186,16 @@ runs:
 
     - name: Prepare previous image
       id: prep-prev
+      env:
+        PREVIOUS_IMAGE: ${{ inputs.previous-image }}
+        PLATFORM: ${{ inputs.platform }}
       shell: bash
       run: |
-        PREVIOUS_IMAGE=$(echo ${{ inputs.previous-image }} | tr '[:upper:]' '[:lower:]')
+        PREVIOUS_IMAGE=$(echo ${PREVIOUS_IMAGE} | tr '[:upper:]' '[:lower:]')
 
         # If the previous image is a multi-arch image, we need to find the digest for the current platform
         # skopeo won't necessarily pick the right one, so we need to do it manually
-        platform=${{ inputs.platform }}
+        platform=${PLATFORM}
         JQ_FILTER=".manifests[] | select(.platform.architecture==\"${platform%/*}\" and "
         if [[ "$platform" = */v* ]]; then
           JQ_FILTER+=".platform.variant==\"${platform#*/}\""
@@ -210,6 +226,8 @@ runs:
         CHANGELOG_SNIPPET: ${{ inputs.changelog-snippet }}
         CHANGELOG: /tmp/changelog-${{ inputs.image-name }}-${{ env.CLEAN_ARCH }}.txt
         INFO_LABEL: dev.hhd.rechunk.info # Kept from hhd-dev/rechunk, so we can compare against older images
+        IMAGE_NAME: ${{ inputs.image-name }}
+        PLATFORM: ${{ inputs.platform }}
       run: |
         echo "::group::Generate changelog"
         PREV=/tmp/previous.json
@@ -252,7 +270,7 @@ runs:
             | if $v then split("<\($kind):\($name)>") | join(if $kind == "version" then $v | sub("-[^-]*$"; "") else $v end) else . end)')
 
         {
-          echo "## Changelog ${{ inputs.image-name }} ${PRETTY} ${{ inputs.platform }}"
+          echo "## Changelog ${IMAGE_NAME} ${PRETTY} ${PLATFORM}"
           echo "### Version: ${VERSION}"
           echo "${SNIPPET}"
           echo
@@ -289,22 +307,25 @@ runs:
         LABELED: localhost/${{ inputs.image-name }}:labeled
         RECHUNKED: localhost/${{ inputs.image-name }}:rechunked
         OUT_DIR: /tmp/rechunked
+        PLATFORM: ${{ inputs.platform }}
+        DOCS_URL: ${{ inputs.docs-url }}
+        IMAGE_NAME: ${{ inputs.image-name }}
       run: |
         echo "::group::Label Image"
         # bootc-base-imagectl keeps the labels of the source image, so they need to be set before rechunking
         mkdir -p /tmp/empty-context
         echo "FROM ${IMAGE_ID#sha256:}" | sudo podman build \
-          --platform=linux/${{ inputs.platform }} \
+          --platform=linux/${PLATFORM} \
           --pull=never \
           --label "redhat.id=${{ steps.check.outputs.redhat-id }}" \
           --label "redhat.version-id=${{ steps.check.outputs.redhat-version-id }}" \
           --label "redhat.major-version=${{ steps.check.outputs.major-version }}" \
           --label "org.opencontainers.image.created=${{ steps.build.outputs.date }}" \
           --label "org.opencontainers.image.description=${IMAGE_DESCRIPTION}" \
-          --label "org.opencontainers.image.documentation=${{ inputs.docs-url }}" \
+          --label "org.opencontainers.image.documentation=${DOCS_URL}" \
           --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
           --label "org.opencontainers.image.revision=${{ github.sha }}" \
-          --label "org.opencontainers.image.title=${{ inputs.image-name }}" \
+          --label "org.opencontainers.image.title=${IMAGE_NAME}" \
           --label "org.opencontainers.image.url=${{ github.event.repository.html_url }}" \
           --label "org.opencontainers.image.vendor=${{ github.repository_owner }}" \
           --label "org.opencontainers.image.version=${{ steps.changelog.outputs.version }}" \
@@ -317,7 +338,7 @@ runs:
         echo "::group::Rechunk Image"
         # rpm-ostree needs /var/tmp as scratch space, which the image may not have (/var is usually emptied)
         sudo podman run --rm \
-          --platform=linux/${{ inputs.platform }} \
+          --platform=linux/${PLATFORM} \
           --pull=never \
           --privileged \
           --security-opt=label=disable \
@@ -350,6 +371,7 @@ runs:
       id: load
       env:
         IMAGE_TAG: ${{ inputs.image-tag }}-${{ env.CLEAN_ARCH }}
+        IMAGE_NAME: ${{ inputs.image-name }}
       shell: bash
       run: |
         echo "::group::Load Image"
@@ -361,9 +383,9 @@ runs:
 
         IMAGE=$(podman pull ${{ steps.rechunk.outputs.ref }})
         sudo rm -rf ${{ steps.rechunk.outputs.location }}
-        podman image tag $IMAGE ${{ inputs.image-name }}:${{ env.IMAGE_TAG }}
+        podman image tag $IMAGE ${IMAGE_NAME}:${{ env.IMAGE_TAG }}
 
-        IMAGE=${{ inputs.image-name }}:${{ env.IMAGE_TAG }}
+        IMAGE=${IMAGE_NAME}:${{ env.IMAGE_TAG }}
         INSPECT=$(podman image inspect $IMAGE)
         echo "image=$IMAGE" >> $GITHUB_OUTPUT
         echo "digest=$(echo "$INSPECT" | jq -r '.[0].Digest')" >> $GITHUB_OUTPUT
@@ -394,20 +416,23 @@ runs:
         echo "::endgroup::"
 
     - name: Create Job Outputs
+      env:
+        PLATFORM: ${{ inputs.platform }}
+        IMAGE_NAME: ${{ inputs.image-name }}
       shell: bash
       run: |
         echo "::group::Create Job Outputs"
         mkdir -p /tmp/outputs/digests/
-        jq -n --arg platform "${{ inputs.platform }}" \
+        jq -n --arg platform "${PLATFORM}" \
           --arg digest "${{ steps.push.outputs.digest }}" \
           --arg redhat_version_id "${{ steps.load.outputs.redhat-version-id }}" \
           --arg version "${{ steps.load.outputs.version }}" \
           --arg image_id "${{ steps.load.outputs.image-id }}" \
           --arg major_version "${{ steps.load.outputs.redhat-major-version }}" \
           '{($platform): {digest: $digest, version: $version, redhat_version_id: $redhat_version_id, image_id: $image_id, major_version: $major_version}}' \
-          > /tmp/outputs/digests/${{ inputs.image-name }}_${{ env.CLEAN_ARCH }}.json
+          > /tmp/outputs/digests/${IMAGE_NAME}_${{ env.CLEAN_ARCH }}.json
 
-        cat /tmp/outputs/digests/${{ inputs.image-name }}_${{ env.CLEAN_ARCH }}.json
+        cat /tmp/outputs/digests/${IMAGE_NAME}_${{ env.CLEAN_ARCH }}.json
         echo "::endgroup::"
 
     - name: Upload Output Artifacts

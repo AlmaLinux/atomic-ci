@@ -34,8 +34,9 @@ runs:
       if: ${{ inputs.signing-secret != '' }}
       env:
         COSIGN_PRIVATE_KEY: ${{ inputs.signing-secret }}
+        IMAGE_REF: ${{ inputs.image-ref }}
       shell: bash
-      run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${{ inputs.image-ref }}
+      run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY "${IMAGE_REF}"
 
     # - name: SBOM Attestation with Signing Secret
     #   if: ${{ inputs.signing-secret != '' && inputs.sbom-path != '' }}
@@ -65,8 +66,11 @@ runs:
 
     - name: Sign Image with KMS
       if: ${{ env.AWS_SESSION_TOKEN != '' }}
+      env:
+        KMS_KEY_ALIAS: ${{ inputs.KMS_KEY_ALIAS }}
+        IMAGE_REF: ${{ inputs.image-ref }}
       shell: bash
-      run: cosign sign --yes --key awskms:///alias/${{ inputs.KMS_KEY_ALIAS }} ${{ inputs.image-ref }}
+      run: cosign sign --yes --key "awskms:///alias/${KMS_KEY_ALIAS}" "${IMAGE_REF}"
 
     # - name: SBOM Attestation with KMS
     #   if: ${{ env.AWS_SESSION_TOKEN != '' && inputs.sbom-path != '' }}
