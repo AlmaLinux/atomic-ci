@@ -53,21 +53,24 @@ runs:
       if: ${{ inputs.upstream-public-key != '' }}
       id: extract
       shell: bash
+      env:
+        CONTAINERFILE: ${{ inputs.containerfile }}
       run: |
-        # Install Dockerfile parser
-        pip3 install dockerfile-parse
-        # Extract the last FROM image using Python
+        # Extract the image of the last FROM, following references to previous build stages
         upstream=$(python3 - << 'EOF'
-        from dockerfile_parse import DockerfileParser
-        from dockerfile_parse.parser import image_from
-        with open("${{ inputs.containerfile }}", "r") as f:
-            dfp = DockerfileParser(fileobj=f)
-            froms = [image_from(s['value']) for s in dfp.structure if s['instruction'] == 'FROM']
-            upstream = froms[-1][0]
-            for image, name in reversed(froms):
-                if name == upstream:
-                    upstream = image
-            print(upstream)
+        import os, re
+
+        with open(os.environ["CONTAINERFILE"]) as f:
+            # Join continuation lines
+            content = re.sub(r"\\[ \t]*\n", " ", f.read())
+
+        # (image, stage name) of each FROM, skipping options like --platform
+        froms = re.findall(r"^\s*FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?", content, re.I | re.M)
+        upstream = froms[-1][0]
+        for image, name in reversed(froms):
+            if name and name.lower() == upstream.lower():
+                upstream = image
+        print(upstream)
         EOF
         )
         echo "upstream-image=$upstream" >> $GITHUB_OUTPUT
