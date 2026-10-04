@@ -10,6 +10,10 @@ on:
         description: "Name of the image, will be used to name the file name ISO"
         required: true
         type: string
+      installer-image:
+        description: "Full podman image reference of the installer environment (a bootc container that contains Anaconda)"
+        required: true
+        type: string
       update_origin_ref:
         description: "Image reference to update from (ie: {image}:latest)"
         required: false
@@ -137,6 +141,7 @@ jobs:
         with:
           image: ${{ inputs.image }}
           image-name: ${{ inputs.image-name }}
+          installer-image: ${{ inputs.installer-image }}
           update_origin_ref: ${{ inputs.update_origin_ref }}
           update_is_signed: ${{ inputs.update_is_signed }}
           config-file: ${{ inputs.config-file }}

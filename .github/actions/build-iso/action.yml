@@ -6,10 +6,13 @@ inputs:
     description: The platform to build the image for (e.g., "x86_64", "arm64")
     required: true
   image:
-    description: Full podman image reference, including hash (e.g., "registry.example.com/image@sha256")
+    description: Full podman image reference of the bootable container to install, including hash (e.g., "registry.example.com/image@sha256")
     required: true
   image-name:
     description: Name of the image, will be used to name the ISO file (e.g., "my-image")
+    required: true
+  installer-image:
+    description: Full podman image reference of the installer environment, including hash. Must be a bootable container that contains Anaconda (e.g., "registry.example.com/installer@sha256")
     required: true
   update_is_signed:
     description: Whether the image is signed or not
@@ -75,34 +78,64 @@ runs:
 
     - name: Build ISO
       id: build
-      #uses: ublue-os/bootc-image-builder-action@b98784c42327746e107a6a753b64f44823bdbf2f
-      uses: alexiri/bootc-image-builder-action@platform
-      with:
-        image: ${{ inputs.image }}
-        type: iso
-        use-librepo: ${{ inputs.use_librepo }}
-        config-file: ${{ inputs.config-file }}
-        platform: linux/${{ inputs.platform }}
+      env:
+        CONFIG_FILE: ${{ inputs.config-file }}
+        INSTALLER_IMAGE: ${{ inputs.installer-image }}
+        IMAGE: ${{ inputs.image }}
+        IMAGE_BUILDER_IMAGE: ghcr.io/osbuild/image-builder-cli:latest
+        PLATFORM: linux/${{ inputs.platform }}
+      shell: bash
+      run: |
+        set -eux
+
+        CONFIG_FILE_EXTENSION="${CONFIG_FILE##*.}"
+
+        USE_LIBREPO=false
+        [ "${{ inputs.use_librepo }}" = "true" ] && USE_LIBREPO=true
+
+        mkdir -p output
+
+        sudo podman pull --platform "${PLATFORM}" "${INSTALLER_IMAGE}"
+        sudo podman pull --platform "${PLATFORM}" "${IMAGE}"
+
+        sudo podman run \
+          --rm \
+          --privileged \
+          --platform "${PLATFORM}" \
+          --security-opt label=type:unconfined_t \
+          -v "$(realpath "${CONFIG_FILE}"):/config.${CONFIG_FILE_EXTENSION}:ro" \
+          -v "${PWD}/output:/output" \
+          -v /var/lib/containers/storage:/var/lib/containers/storage \
+          "${IMAGE_BUILDER_IMAGE}" \
+          build \
+            --bootc-ref "${INSTALLER_IMAGE}" \
+            --bootc-installer-payload-ref "${IMAGE}" \
+            --blueprint "/config.${CONFIG_FILE_EXTENSION}" \
+            --output-dir /output \
+            --output-name "${{ inputs.image-name }}-${CLEAN_ARCH}" \
+            --use-librepo=${USE_LIBREPO} \
+            bootc-installer
+
+        sudo chown -R "$(id -u):$(id -g)" output
 
     - name: Rename ISO
       id: rename
       env:
-        IMAGE_NAME: ${{ inputs.image-name }}-${{ env.CLEAN_ARCH }}-live.iso
         OUTPUT_PATH: output-${{ env.CLEAN_ARCH }}
       shell: bash
       run: |
         set -x
-        mkdir -p ${{ env.OUTPUT_PATH }}
-        OUTPUT_DIRECTORY="$(realpath ${{ env.OUTPUT_PATH }})"
+        mkdir -p "${OUTPUT_PATH}"
+        OUTPUT_DIRECTORY="$(realpath "${OUTPUT_PATH}")"
 
         ARTIFACT_NAME="${{ inputs.image-name }}-${{ env.CLEAN_ARCH }}"
         ISO_NAME="${ARTIFACT_NAME}.iso"
         CHECKSUM_NAME="${ISO_NAME}-CHECKSUM"
 
-        mv ${{ steps.build.outputs.output-path }} "${OUTPUT_DIRECTORY}/${ISO_NAME}"
-        mv ${{ steps.build.outputs.checksum-path }} "${OUTPUT_DIRECTORY}/${CHECKSUM_NAME}"
+        mv "output/${ISO_NAME}" "${OUTPUT_DIRECTORY}/${ISO_NAME}"
+        sha256sum "${OUTPUT_DIRECTORY}/${ISO_NAME}" | awk '{print $1}' > "${OUTPUT_DIRECTORY}/${CHECKSUM_NAME}"
 
-        echo "output_directory=$OUTPUT_DIRECTORY" >> "${GITHUB_OUTPUT}"
+        echo "output_directory=${OUTPUT_DIRECTORY}" >> "${GITHUB_OUTPUT}"
         echo "ISO_NAME=${ISO_NAME}" >> "${GITHUB_OUTPUT}"
         echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> "${GITHUB_OUTPUT}"
         echo "CHECKSUM_NAME=${CHECKSUM_NAME}" >> "${GITHUB_OUTPUT}"
