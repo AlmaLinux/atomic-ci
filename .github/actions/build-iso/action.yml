@@ -33,9 +33,6 @@ inputs:
   skip-maximize-build-space:
     description: Whether to skip maximizing build space
     required: false
-  use_librepo:
-    description: "Deprecated, image-builder always uses librepo"
-    required: false
   REGISTRY:
     description: The container registry URL (e.g., "registry.example.com")
     required: true

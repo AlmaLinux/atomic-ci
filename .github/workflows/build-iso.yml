@@ -37,11 +37,6 @@ on:
         required: false
         type: string
         default: "amd64,arm64"
-      use_librepo:
-        description: "Deprecated, image-builder always uses librepo"
-        required: false
-        type: boolean
-        default: false
       REGISTRY_USER:
         description: "The username to use for the registry"
         required: false

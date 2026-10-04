@@ -33,6 +33,10 @@ so you can apply them to your own repository.
 
   Template change: https://github.com/AlmaLinux/atomic-respin-template/commit/810966f2
 
+- **Remove the `use_librepo` input** from the job that calls `build-iso.yml`, if you set it.
+  The input no longer exists, image-builder always uses librepo, and passing it makes the
+  workflow invalid. The template never set it, so most repositories are not affected.
+
 ### Changed
 
 - **ISOs are now live images.** They boot into a live session of your image, with an
@@ -42,7 +46,6 @@ so you can apply them to your own repository.
   - Only the kickstart (`[customizations.installer.kickstart]`) of the ISO configuration
     file is used. Other customizations are ignored, with a warning.
   - `config-file` is now optional.
-  - `use_librepo` is deprecated and has no effect.
 - **Images are rechunked with `bootc-base-imagectl rechunk`** instead of `hhd-dev/rechunk`.
   The layers of the image are split differently, so the first update after this change
   downloads the whole image again.
