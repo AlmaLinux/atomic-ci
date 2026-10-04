@@ -32,7 +32,7 @@ on:
 jobs:
   retag-image:
     name: Retag image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Install Crane

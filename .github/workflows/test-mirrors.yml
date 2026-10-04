@@ -4,7 +4,7 @@ on:
 
 jobs:
     test:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         steps:
             - name: Test
               shell: bash
