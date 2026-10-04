@@ -1,5 +1,6 @@
 ---
 name: Build ISO
+description: Build an ISO image from a container image
 
 inputs:
   platform:

@@ -1,5 +1,6 @@
 ---
 name: Upload to Cloudflare R2
+description: Upload files to Cloudflare R2
 
 inputs:
   directory:

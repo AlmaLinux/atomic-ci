@@ -1,5 +1,6 @@
 ---
 name: Create Manifest
+description: Create a manifest list from multiple container images
 
 inputs:
   platforms:

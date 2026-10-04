@@ -1,5 +1,6 @@
 ---
 name: SBOM Generation
+description: Generate a Software Bill of Materials (SBOM) for a given container image
 
 inputs:
   image-ref:

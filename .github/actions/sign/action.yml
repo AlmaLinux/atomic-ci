@@ -1,5 +1,6 @@
 ---
 name: Sign image
+description: Sign a container image with a signing key
 
 inputs:
   signing-secret:

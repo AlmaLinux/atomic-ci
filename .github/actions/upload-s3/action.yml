@@ -1,12 +1,13 @@
 ---
 name: Upload to Amazon S3
+description: Upload files to Amazon S3
 
 inputs:
   directory:
     description: "The directory containing the files to upload"
     required: true
   bucket:
-    description: "The Cloudflare R2 bucket to upload the files to"
+    description: "The Amazon S3 bucket to upload the files to"
     required: true
   path:
     description: "The path to the files to upload, relative to the directory"

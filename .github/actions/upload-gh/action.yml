@@ -1,5 +1,6 @@
 ---
 name: Upload to GitHub Actions Artifacts
+description: Upload files to GitHub Actions artifacts
 
 inputs:
   artifact_name:
