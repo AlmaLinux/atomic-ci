@@ -251,19 +251,26 @@ runs:
             $pkgs[0][$name] as $v
             | if $v then split("<\($kind):\($name)>") | join(if $kind == "version" then $v | sub("-[^-]*$"; "") else $v end) else . end)')
 
-        cat > $CHANGELOG <<EOF
-        ## Changelog ${{ inputs.image-name }} ${PRETTY} ${{ inputs.platform }}
-        ### Version: ${VERSION}
-        ${SNIPPET}
-
-        ### Changes since last version (${PREV_VERSION:-<previous>}):
-        #### Commits
-        ${COMMITS:--}
-
-        #### Package Changes
-        ${PKGUPD:--}
-
-        EOF
+        {
+          echo "## Changelog ${{ inputs.image-name }} ${PRETTY} ${{ inputs.platform }}"
+          echo "### Version: ${VERSION}"
+          echo "${SNIPPET}"
+          echo
+          # Only include the sections that have something in them
+          if [[ -n "$COMMITS" || -n "$PKGUPD" ]]; then
+            echo "### Changes since last version${PREV_VERSION:+ ($PREV_VERSION)}:"
+            if [[ -n "$COMMITS" ]]; then
+              echo "#### Commits"
+              echo "${COMMITS}"
+              echo
+            fi
+            if [[ -n "$PKGUPD" ]]; then
+              echo "#### Package Changes"
+              echo "${PKGUPD}"
+              echo
+            fi
+          fi
+        } > $CHANGELOG
         cat $CHANGELOG
 
         jq -c --arg uniq "$VERSION" --arg revision "${{ github.sha }}" \
