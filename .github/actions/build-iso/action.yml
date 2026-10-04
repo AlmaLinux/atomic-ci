@@ -12,10 +12,10 @@ inputs:
   image-name:
     description: Name of the image, will be used to name the ISO file (e.g., "my-image")
     required: true
-  update_is_signed:
+  update-is-signed:
     description: Whether the image is signed or not
     required: false
-  update_origin_ref:
+  update-origin-ref:
     description: Image reference to update from (e.g., "{image}:latest")
     required: true
   config-file:
@@ -44,16 +44,16 @@ inputs:
     required: true
 
 outputs:
-  output_directory:
+  output-directory:
     description: The directory where the built ISO and checksum are stored
     value: ${{ steps.rename.outputs.output_directory }}
-  artifact_name:
+  artifact-name:
     description: The name of the artifact (ISO file) without the extension
     value: ${{ steps.rename.outputs.ARTIFACT_NAME }}
-  iso_name:
+  iso-name:
     description: The name of the built ISO file
     value: ${{ steps.rename.outputs.ISO_NAME }}
-  checksum_name:
+  checksum-name:
     description: The name of the checksum file for the ISO
     value: ${{ steps.rename.outputs.CHECKSUM_NAME }}
 
@@ -93,7 +93,7 @@ runs:
         cp ${{ github.action_path }}/live/* "${CONTEXT}/"
 
         if [[ -n "${CONFIG_FILE}" ]]; then
-          [ "${{ inputs.update_is_signed }}" = "true" ] && SIG="--enforce-container-sigpolicy"
+          [ "${{ inputs.update-is-signed }}" = "true" ] && SIG="--enforce-container-sigpolicy"
 
           # image-builder doesn't take a blueprint for this kind of ISO, the installer is configured
           # in the live image. Keep supporting the kickstart from the configuration file.
@@ -114,7 +114,7 @@ runs:
             print(f"::warning::Not supported in live ISOs, ignoring from {sys.argv[1]}: {', '.join(ignored)}", file=sys.stderr)
         EOF
 
-          sed -i 's#<UPDATE_IMAGE_REF>#${{ inputs.update_origin_ref }}#g' "${CONTEXT}/kickstart.ks"
+          sed -i 's#<UPDATE_IMAGE_REF>#${{ inputs.update-origin-ref }}#g' "${CONTEXT}/kickstart.ks"
           sed -i "s#<IMAGE_SIGNED>#${SIG}#g" "${CONTEXT}/kickstart.ks"
           cat "${CONTEXT}/kickstart.ks"
         fi
@@ -151,7 +151,7 @@ runs:
           --cap-add=sys_admin \
           --security-opt=label=disable \
           --build-arg IMAGE_REF="${IMAGE}" \
-          --build-arg UPDATE_IMAGE_REF="${{ inputs.update_origin_ref }}" \
+          --build-arg UPDATE_IMAGE_REF="${{ inputs.update-origin-ref }}" \
           --build-arg ISO_NAME="${{ inputs.image-name }}" \
           --build-arg ISO_LABEL="" \
           -t "${LIVE_IMAGE}" \

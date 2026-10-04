@@ -10,11 +10,11 @@ on:
         description: "Name of the image, will be used to name the file name ISO"
         required: true
         type: string
-      update_origin_ref:
+      update-origin-ref:
         description: "Image reference to update from (ie: {image}:latest)"
         required: false
         type: string
-      update_is_signed:
+      update-is-signed:
         description: "Whether the image is signed or not"
         required: false
         type: boolean
@@ -141,8 +141,8 @@ jobs:
         with:
           image: ${{ inputs.image }}
           image-name: ${{ inputs.image-name }}
-          update_origin_ref: ${{ inputs.update_origin_ref }}
-          update_is_signed: ${{ inputs.update_is_signed }}
+          update-origin-ref: ${{ inputs.update-origin-ref }}
+          update-is-signed: ${{ inputs.update-is-signed }}
           config-file: ${{ inputs.config-file }}
           hook-script: ${{ inputs.hook-script }}
           skip-maximize-build-space: ${{ inputs.skip-maximize-build-space }}
@@ -155,14 +155,14 @@ jobs:
         if: inputs.upload-to-github == true
         uses: ./github-actions/.github/actions/upload-gh
         with:
-          artifact_name: ${{ steps.build-iso.outputs.artifact_name }}
-          directory: ${{ steps.build-iso.outputs.output_directory }}
+          artifact-name: ${{ steps.build-iso.outputs.artifact-name }}
+          directory: ${{ steps.build-iso.outputs.output-directory }}
 
       - name: Upload to Cloudflare
         if: inputs.upload-to-cloudflare == true
         uses: ./github-actions/.github/actions/upload-r2
         with:
-          directory: ${{ steps.build-iso.outputs.output_directory }}
+          directory: ${{ steps.build-iso.outputs.output-directory }}
           bucket: ${{ inputs.bucket }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY_ID }}
@@ -172,10 +172,10 @@ jobs:
         if: inputs.upload-to-s3 == true
         uses: ./github-actions/.github/actions/upload-s3
         with:
-          directory: ${{ steps.build-iso.outputs.output_directory }}
+          directory: ${{ steps.build-iso.outputs.output-directory }}
           bucket: ${{ inputs.bucket }}
           path: ${{ inputs.s3-path }}
           aws-default-region: ${{ inputs.aws-default-region }}
-          iso-name: ${{ steps.build-iso.outputs.iso_name }}
-          checksum-name: ${{ steps.build-iso.outputs.checksum_name }}
+          iso-name: ${{ steps.build-iso.outputs.iso-name }}
+          checksum-name: ${{ steps.build-iso.outputs.checksum-name }}
           AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}

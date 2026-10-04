@@ -33,6 +33,11 @@ so you can apply them to your own repository.
 
   Template change: https://github.com/AlmaLinux/atomic-respin-template/commit/810966f2
 
+- **Rename two inputs** in the job that calls `build-iso.yml`. Inputs are now named
+  consistently, and the old names make the workflow invalid:
+  - `update_origin_ref` is now `update-origin-ref`
+  - `update_is_signed` is now `update-is-signed`
+
 - **Remove the `use_librepo` input** from the job that calls `build-iso.yml`, if you set it.
   The input no longer exists, image-builder always uses librepo, and passing it makes the
   workflow invalid. The template never set it, so most repositories are not affected.
