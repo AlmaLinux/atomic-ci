@@ -141,6 +141,36 @@ runs:
           | jq -Rn '[inputs | split("\t") | {key: .[0], value: .[1]}] | reverse | from_entries' > /tmp/packages.json
         echo "::endgroup::"
 
+    # Respins built from older templates run `mv /usr/local /var/usrlocal` on top of a base image
+    # where /usr/local is already a symlink to /var/usrlocal (and /var is empty). That moves the
+    # symlink itself, leaving /var/usrlocal pointing at itself. Since /usr/local/{bin,sbin} are in
+    # the PATH, the loop breaks `/usr/bin/env` lookups, which bootc-base-imagectl needs to rechunk
+    # the image, and it would also ship a broken /usr/local to users. Removing the looping symlink
+    # restores the state of the base image.
+    # This is fixed in https://github.com/AlmaLinux/atomic-respin-template/commit/396969c4 as of 2026-10-04,
+    # once this is far enough in the past, we can remove this step.
+    - name: Fix /usr/local symlink loop
+      id: fix
+      shell: bash
+      env:
+        IMAGE_ID: ${{ steps.build.outputs.image-id }}
+      run: |
+        echo "::group::Fix /usr/local symlink loop"
+        if sudo podman run --platform=linux/${{ inputs.platform }} --rm ${IMAGE_ID} bash -c '[[ "$(readlink /var/usrlocal)" == /var/usrlocal ]]'; then
+          echo "::warning::/var/usrlocal is a symlink to itself, removing it. Update files/scripts/cleanup.sh from the respin template to fix this in your image."
+          mkdir -p /tmp/empty-context
+          printf 'FROM %s\nRUN rm /var/usrlocal\n' "${IMAGE_ID#sha256:}" | sudo podman build \
+            --platform=linux/${{ inputs.platform }} \
+            --pull=never \
+            --security-opt=label=disable \
+            --iidfile /tmp/image-id \
+            -f - \
+            /tmp/empty-context
+          IMAGE_ID=$(cat /tmp/image-id)
+        fi
+        echo "image-id=${IMAGE_ID}" >> $GITHUB_OUTPUT
+        echo "::endgroup::"
+
     - name: Prepare previous image
       id: prep-prev
       shell: bash
@@ -247,7 +277,7 @@ runs:
       id: rechunk
       shell: bash
       env:
-        IMAGE_ID: ${{ steps.build.outputs.image-id }}
+        IMAGE_ID: ${{ steps.fix.outputs.image-id }}
         IMAGE_DESCRIPTION: ${{ inputs.image-description }}
         LABELED: localhost/${{ inputs.image-name }}:labeled
         RECHUNKED: localhost/${{ inputs.image-name }}:rechunked
@@ -291,7 +321,7 @@ runs:
           rechunk $LABELED $RECHUNKED
 
         # Move the rechunked image out of root's storage, removing the originals to make space
-        sudo podman rmi -f $LABELED $IMAGE_ID
+        sudo podman rmi -f --ignore $LABELED $IMAGE_ID ${{ steps.build.outputs.image-id }}
         sudo skopeo copy --dest-oci-accept-uncompressed-layers containers-storage:$RECHUNKED oci:$OUT_DIR
         sudo podman rmi $RECHUNKED
         sudo chown $(id -u):$(id -g) -R $OUT_DIR
