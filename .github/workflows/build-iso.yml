@@ -20,16 +20,25 @@ on:
         type: boolean
         default: true
       config-file:
-        description: "Path to the ISO configuration file"
-        required: true
+        description: "Path to the ISO configuration file. Only the kickstart ([customizations.installer.kickstart]) is used, it's added to the kickstart of the installer"
+        required: false
         type: string
+      hook-script:
+        description: "Path to a script that runs at the end of the live image build, to customize the live environment"
+        required: false
+        type: string
+      skip-maximize-build-space:
+        description: "Skip maximizing build space"
+        required: false
+        type: boolean
+        default: false
       platforms:
         description: "The platforms to build the image for"
         required: false
         type: string
         default: "amd64,arm64"
       use_librepo:
-        description: "Use librepo to download the image"
+        description: "Deprecated, image-builder always uses librepo"
         required: false
         type: boolean
         default: false
@@ -116,9 +125,9 @@ jobs:
       fail-fast: false
       matrix: ${{fromJson(needs.generate_matrix.outputs.matrix)}}
     permissions:
-      id-token: write
+      id-token: write # For uploads to AWS S3
       contents: read
-      packages: write
+      packages: read
 
     steps:
       - name: Checkout
@@ -140,8 +149,9 @@ jobs:
           update_origin_ref: ${{ inputs.update_origin_ref }}
           update_is_signed: ${{ inputs.update_is_signed }}
           config-file: ${{ inputs.config-file }}
+          hook-script: ${{ inputs.hook-script }}
+          skip-maximize-build-space: ${{ inputs.skip-maximize-build-space }}
           platform: ${{ matrix.platform }}
-          use_librepo: ${{ inputs.use_librepo }}
           REGISTRY: ${{ inputs.REGISTRY }}
           REGISTRY_USER: ${{ inputs.REGISTRY_USER }}
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
