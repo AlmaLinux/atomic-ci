@@ -105,7 +105,7 @@ on:
         description: "The private key used to sign the image"
         required: false
       AWS_ROLE_ARN:
-        description: "The AWS role ARN to assume for S3 uploads"
+        description: "The AWS role ARN to assume for signing the image"
         required: false
 
 env:
@@ -129,10 +129,10 @@ jobs:
       tag: ${{ steps.set-matrix.outputs.tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Checkout github actions
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: AlmaLinux/atomic-ci
           ref: ${{ env.INTERNAL_ACTIONS_REF }}
@@ -159,21 +159,14 @@ jobs:
       packages: write
       id-token: write
 
-    outputs:
-      image-ref: ${{ steps.push.outputs.image-ref }}
-      digest: ${{ steps.push.outputs.digest }}
-      redhat-id: ${{ steps.check.outputs.redhat-id }}
-      redhat-version-id: ${{ steps.check.outputs.redhat-version-id }}
-      version: ${{ steps.load.outputs.version }}
-
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # Fetch all history for changelog generation
 
       - name: Checkout github actions
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: AlmaLinux/atomic-ci
           ref: ${{ env.INTERNAL_ACTIONS_REF }}
@@ -238,7 +231,7 @@ jobs:
       signing-enabled: ${{ env.SIGNING_ENABLED }}
     steps:
       - name: Checkout github actions
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: AlmaLinux/atomic-ci
           ref: ${{ env.INTERNAL_ACTIONS_REF }}
