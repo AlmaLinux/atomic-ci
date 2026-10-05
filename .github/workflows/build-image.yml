@@ -109,10 +109,6 @@ on:
         required: false
 
 env:
-  IMAGE_NAME: ${{ inputs.image-name }}
-  CONTAINERFILE: ${{ inputs.containerfile }}
-  IMAGE_REGISTRY: ${{ inputs.REGISTRY }}
-  IMAGE_PATH: ${{ inputs.image-path }}
   SIGNING_ENABLED: ${{ (secrets.SIGNING_SECRET != null && secrets.SIGNING_SECRET != '') || inputs.KMS_KEY_ALIAS != '' }}
   INTERNAL_ACTIONS_REF: dev/v12
 
@@ -245,7 +241,6 @@ jobs:
           image-name: ${{ inputs.image-name }}
           image-path: ${{ inputs.image-path }}
           image-tag: ${{ needs.generate_matrix.outputs.tag }}
-          containerfile: ${{ inputs.containerfile }}
           REGISTRY: ${{ inputs.REGISTRY }}
           REGISTRY_USER: ${{ inputs.REGISTRY_USER }}
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}

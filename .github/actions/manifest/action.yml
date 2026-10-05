@@ -15,9 +15,6 @@ inputs:
   image-tag:
     description: The tag for the image
     required: true
-  containerfile:
-    description: The path to the Containerfile used for building the image
-    required: true
   REGISTRY:
     description: The container registry URL (e.g., "registry.example.com")
     required: true

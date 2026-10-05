@@ -189,7 +189,6 @@ It has to run in the same workflow run as `build-image.yml`, as it uses the arti
 |---|---|---|
 | `image-name` | yes | Name of the image |
 | `version` | yes | Version of the image, used as the tag of the release |
-| `pretty-version` | yes | Not used at the moment |
 | `latest-image-ref` | yes | Reference to show in the instructions to switch to the image |
 
 # Contributing

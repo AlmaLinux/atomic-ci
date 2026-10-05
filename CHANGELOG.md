@@ -38,6 +38,9 @@ so you can apply them to your own repository.
   - `update_origin_ref` is now `update-origin-ref`
   - `update_is_signed` is now `update-is-signed`
 
+- **Remove the `pretty-version` input** from the job that calls `create-release.yml`. It was
+  never used and no longer exists, and passing it makes the workflow invalid.
+
 - **Remove the `use_librepo` input** from the job that calls `build-iso.yml`, if you set it.
   The input no longer exists, image-builder always uses librepo, and passing it makes the
   workflow invalid. The template never set it, so most repositories are not affected.
