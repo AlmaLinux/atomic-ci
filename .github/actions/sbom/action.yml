@@ -70,6 +70,9 @@ runs:
       id: generate-sbom
       env:
         SYFT_CMD: ${{ steps.setup-syft.outputs.cmd }}
+        # syft unpacks the whole image in its temporary directory. /tmp is a tmpfs with a quota
+        # in Ubuntu 26.04, which is too small for that, so use a directory in the disk.
+        TMPDIR: ${{ runner.temp }}
         ARTIFACT_NAME: ${{ inputs.artifact-name }}
         IMAGE_REF: ${{ inputs.image-ref }}
       shell: bash

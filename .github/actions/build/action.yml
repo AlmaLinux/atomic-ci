@@ -307,7 +307,8 @@ runs:
         LICENSE: ${{ github.event.repository.license.spdx_id }}
         LABELED: localhost/${{ inputs.image-name }}:labeled
         RECHUNKED: localhost/${{ inputs.image-name }}:rechunked
-        OUT_DIR: /tmp/rechunked
+        # Not in /tmp, which is a tmpfs in Ubuntu 26.04 and too small for the image
+        OUT_DIR: ${{ runner.temp }}/rechunked
         PLATFORM: ${{ inputs.platform }}
         DOCS_URL: ${{ inputs.docs-url }}
         IMAGE_NAME: ${{ inputs.image-name }}
