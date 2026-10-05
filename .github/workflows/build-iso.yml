@@ -110,6 +110,7 @@ jobs:
 
   build-iso:
     runs-on: ${{ matrix.platform == 'arm64' && 'ubuntu-26.04-arm' || 'ubuntu-26.04' }}
+    timeout-minutes: 60
     needs: generate_matrix
     strategy:
       fail-fast: false
