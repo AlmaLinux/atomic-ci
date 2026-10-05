@@ -58,8 +58,9 @@ multi-platform manifest. For each platform it:
 3. Rechunks the image with `bootc-base-imagectl rechunk`, so updates only download the layers that
    changed.
 4. Generates a changelog with the commits and package changes since `previous-image`.
-5. Pushes the image, and on the default branch generates an SBOM (if `generate-sbom` is set) and
-   signs the image (if a signing key is configured).
+5. Pushes the image and signs it, if a signing key is configured. Builds of pull requests are not
+   signed until they are merged.
+6. Generates an SBOM on the default branch, if `generate-sbom` is set.
 
 The image has to be based on an AlmaLinux bootc image.
 

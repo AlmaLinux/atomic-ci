@@ -195,10 +195,13 @@ jobs:
           image-ref: ${{ steps.build.outputs.image-ref }}@${{ steps.build.outputs.digest }}
           artifact-name: ${{ inputs.image-name }}-${{ inputs.variant }}-${{ matrix.platform }}
 
+      # Builds of any branch are signed, so they can be tested in systems that verify signatures.
+      # Builds of pull requests are not, until they are merged: they run code that hasn't been
+      # reviewed, and anyone can open one.
       - uses: ./github-actions/.github/actions/sign
         name: Sign image
         id: sign
-        if: ${{ env.SIGNING_ENABLED == 'true' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || github.event.pull_request.merged == true) }}
+        if: ${{ env.SIGNING_ENABLED == 'true' && (!startsWith(github.event_name, 'pull_request') || github.event.pull_request.merged == true) }}
         with:
           image-ref: ${{ steps.build.outputs.image-ref }}@${{ steps.build.outputs.digest }}
           signing-secret: ${{ secrets.SIGNING_SECRET }}
@@ -248,7 +251,7 @@ jobs:
       - uses: ./github-actions/.github/actions/sign
         name: Sign Manifest
         id: sign
-        if: ${{ env.SIGNING_ENABLED == 'true' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || github.event.pull_request.merged == true) }}
+        if: ${{ env.SIGNING_ENABLED == 'true' && (!startsWith(github.event_name, 'pull_request') || github.event.pull_request.merged == true) }}
         with:
           image-ref: ${{ steps.push_manifest.outputs.image-ref }}@${{ steps.push_manifest.outputs.digest }}
           signing-secret: ${{ secrets.SIGNING_SECRET }}

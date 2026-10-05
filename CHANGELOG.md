@@ -11,6 +11,8 @@ changes in the [upgrade guide](UPGRADE.md).
   connection. Only the kickstart of the ISO configuration file is used.
 - Images are rechunked with a different tool, so the first update to an image built with v12
   downloads the whole image again.
+- Images built from any branch are signed, not only the ones from the default branch. Builds of
+  pull requests are still not signed until they are merged.
 - Builds run on Ubuntu 26.04.
 - New `hook-script` input for `build-iso.yml`, to customize the live environment of the ISO.
 
