@@ -85,3 +85,63 @@ runs:
     #       --type spdxjson \
     #       --key awskms:///alias/${{ inputs.KMS_KEY_ALIAS }} \
     #       ${{ inputs.image-ref }}
+
+    # Systems only accept an update if they can find and verify its signature, so make sure that
+    # what was just pushed is what they expect. Verifying with cosign is not enough: the
+    # containers library used by bootc and podman only reads the signatures stored in the
+    # "sha256-<digest>.sig" tag, and newer versions of cosign store them in a different format by
+    # default, which cosign itself is happy to verify. That left systems unable to update before.
+    - name: Verify signature
+      if: ${{ inputs.signing-secret != '' || env.AWS_SESSION_TOKEN != '' }}
+      env:
+        COSIGN_PRIVATE_KEY: ${{ inputs.signing-secret }}
+        KMS_KEY_ALIAS: ${{ inputs.KMS_KEY_ALIAS }}
+        IMAGE_REF: ${{ inputs.image-ref }}
+      shell: bash
+      run: |
+        # The signature is stored where the containers library looks for it
+        SIGNATURE_REF="${IMAGE_REF%@*}:$(echo "${IMAGE_REF#*@}" | tr ':' '-').sig"
+        if ! skopeo inspect --raw "docker://${SIGNATURE_REF}" > /dev/null; then
+          echo "::error::No signature found in ${SIGNATURE_REF}, systems would refuse to update to this image"
+          exit 1
+        fi
+        echo "Found the signature in ${SIGNATURE_REF}"
+
+        # The signature is valid for the keys used to sign
+        if [[ -n "${COSIGN_PRIVATE_KEY}" ]]; then
+          cosign public-key --key env://COSIGN_PRIVATE_KEY > "${RUNNER_TEMP}/cosign.pub"
+          cosign verify --key "${RUNNER_TEMP}/cosign.pub" "${IMAGE_REF}" > /dev/null
+        fi
+        if [[ -n "${AWS_SESSION_TOKEN}" ]]; then
+          cosign verify --key "awskms:///alias/${KMS_KEY_ALIAS}" "${IMAGE_REF}" > /dev/null
+        fi
+
+    # A stricter version of the check above: pull the image with the tools of the image itself
+    # (the same ones an installed system uses) and a policy that requires the signature. It
+    # downloads the whole image again, which is why it's disabled. For a multi-platform manifest
+    # only the manifest is signed, add --multi-arch=index-only to skopeo to check just that.
+    # Needs the public key in ${RUNNER_TEMP}/cosign.pub, the step above creates it when signing
+    # with a signing secret.
+    # - name: Verify signature like an installed system
+    #   if: ${{ inputs.signing-secret != '' }}
+    #   env:
+    #     IMAGE_REF: ${{ inputs.image-ref }}
+    #   shell: bash
+    #   run: |
+    #     REPOSITORY="${IMAGE_REF%@*}"
+    #     jq -n --arg repository "${REPOSITORY}" '{
+    #       default: [{type: "reject"}],
+    #       transports: {
+    #         docker: {($repository): [{type: "sigstoreSigned", keyPath: "/verify/cosign.pub", signedIdentity: {type: "matchRepository"}}]},
+    #         dir: {"": [{type: "insecureAcceptAnything"}]}
+    #       }
+    #     }' > "${RUNNER_TEMP}/verify-policy.json"
+    #     printf 'docker:\n  %s:\n    use-sigstore-attachments: true\n' "${REPOSITORY}" > "${RUNNER_TEMP}/verify-registry.yaml"
+    #
+    #     podman run --rm \
+    #       -v "${RUNNER_TEMP}/cosign.pub":/verify/cosign.pub:ro \
+    #       -v "${RUNNER_TEMP}/verify-policy.json":/verify/policy.json:ro \
+    #       -v "${RUNNER_TEMP}/verify-registry.yaml":/etc/containers/registries.d/verify.yaml:ro \
+    #       -v "${REGISTRY_AUTH_FILE:-${XDG_RUNTIME_DIR}/containers/auth.json}":/run/containers/0/auth.json:ro \
+    #       "${IMAGE_REF}" \
+    #       skopeo --policy /verify/policy.json copy "docker://${IMAGE_REF}" dir:/tmp/verify
