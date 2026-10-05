@@ -170,7 +170,9 @@ runs:
           AUTH_ARGS=(--authfile "${AUTHFILE}")
         fi
         # The image is embedded in the ISO, so it can be installed without a network connection
-        sudo podman pull "${AUTH_ARGS[@]}" --platform=linux/${PLATFORM} "${IMAGE}"
+        # Keep the ID: for platforms with a variant (amd64/v2), podman doesn't find the image by its
+        # name when given --platform, as the image doesn't record the variant
+        IMAGE_ID=$(sudo podman pull --quiet "${AUTH_ARGS[@]}" --platform=linux/${PLATFORM} "${IMAGE}")
         echo "::endgroup::"
 
         echo "::group::Build live image"
@@ -179,14 +181,18 @@ runs:
           --pull=never \
           --cap-add=sys_admin \
           --security-opt=label=disable \
+          --build-arg BASE_IMAGE="${IMAGE_ID}" \
           --build-arg IMAGE_REF="${IMAGE}" \
           --build-arg UPDATE_IMAGE_REF="${UPDATE_ORIGIN_REF}" \
           --build-arg ISO_NAME="${IMAGE_NAME}" \
           --build-arg ISO_LABEL="" \
           -t "${LIVE_IMAGE}" \
+          --iidfile "${RUNNER_TEMP}/live-image-id" \
           -f "${CONTEXT}/Containerfile" \
           "${CONTEXT}"
         echo "live-image=${LIVE_IMAGE}" >> "${GITHUB_OUTPUT}"
+        echo "live-image-id=$(cat "${RUNNER_TEMP}/live-image-id")" >> "${GITHUB_OUTPUT}"
+        echo "image-id=${IMAGE_ID}" >> "${GITHUB_OUTPUT}"
         echo "::endgroup::"
 
     - name: Build ISO
@@ -199,6 +205,8 @@ runs:
       run: |
         echo "::group::Build ISO"
         mkdir -p "${OUTPUT}"
+        # image-builder takes the images by name: the one to install is stored in the ISO under
+        # that name, which is how the installer refers to it. It looks them up without a platform.
         sudo podman run \
           --rm \
           --privileged \
@@ -216,7 +224,7 @@ runs:
         sudo chown -R "$(id -u):$(id -g)" "${OUTPUT}"
 
         # Make space for the uploads
-        sudo podman rmi -f "${{ steps.live.outputs.live-image }}" "${IMAGE}"
+        sudo podman rmi -f "${{ steps.live.outputs.live-image-id }}" "${{ steps.live.outputs.image-id }}"
 
         ISO="$(find "${OUTPUT}" -name '*.iso' | head -1)"
         [[ -f "${ISO}" ]] || { echo "::error::No ISO found in ${OUTPUT}"; exit 1; }

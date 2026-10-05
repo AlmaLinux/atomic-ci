@@ -305,7 +305,6 @@ runs:
         IMAGE_ID: ${{ steps.fix.outputs.image-id }}
         IMAGE_DESCRIPTION: ${{ inputs.image-description }}
         LICENSE: ${{ github.event.repository.license.spdx_id }}
-        LABELED: localhost/${{ inputs.image-name }}:labeled
         RECHUNKED: localhost/${{ inputs.image-name }}:rechunked
         # Not in /tmp, which is a tmpfs in Ubuntu 26.04 and too small for the image
         OUT_DIR: ${{ runner.temp }}/rechunked
@@ -340,7 +339,7 @@ runs:
           --label "org.opencontainers.image.version=${{ steps.changelog.outputs.version }}" \
           "${LICENSE_ARGS[@]}" \
           --label "dev.hhd.rechunk.info=$(cat /tmp/image-info.json)" \
-          -t $LABELED \
+          --iidfile /tmp/labeled-image-id \
           -f - \
           /tmp/empty-context <<'EOF'
         ARG IMAGE
@@ -366,6 +365,10 @@ runs:
         echo "::endgroup::"
 
         echo "::group::Rechunk Image"
+        # Images are always used by ID. For platforms with a variant (amd64/v2), podman doesn't find
+        # a local image by its name when given --platform, as images don't record the variant.
+        LABELED_ID=$(cut -d: -f2 /tmp/labeled-image-id)
+
         # rpm-ostree needs /var/tmp as scratch space, which the image may not have (/var is usually emptied)
         sudo podman run --rm \
           --platform=linux/${PLATFORM} \
@@ -375,13 +378,15 @@ runs:
           -v /var/lib/containers:/var/lib/containers \
           -v /var/tmp:/var/tmp \
           --entrypoint=/usr/libexec/bootc-base-imagectl \
-          $LABELED \
-          rechunk $LABELED $RECHUNKED
+          $LABELED_ID \
+          rechunk $LABELED_ID $RECHUNKED
 
         # Move the rechunked image out of root's storage, removing the originals to make space
-        sudo podman rmi -f --ignore $LABELED $IMAGE_ID ${{ steps.build.outputs.image-id }}
-        sudo skopeo copy --dest-oci-accept-uncompressed-layers containers-storage:$RECHUNKED oci:$OUT_DIR
-        sudo podman rmi $RECHUNKED
+        # The rechunker can only write to a name, get the ID of what it created
+        RECHUNKED_ID=$(sudo podman image inspect --format '{{.Id}}' $RECHUNKED)
+        sudo podman rmi -f --ignore $LABELED_ID $IMAGE_ID ${{ steps.build.outputs.image-id }}
+        sudo skopeo copy --dest-oci-accept-uncompressed-layers containers-storage:$RECHUNKED_ID oci:$OUT_DIR
+        sudo podman rmi -f $RECHUNKED_ID
         sudo chown $(id -u):$(id -g) -R $OUT_DIR
 
         echo "ref=oci:$OUT_DIR" >> $GITHUB_OUTPUT
@@ -399,9 +404,6 @@ runs:
 
     - name: Load Image
       id: load
-      env:
-        IMAGE_TAG: ${{ inputs.image-tag }}-${{ env.CLEAN_ARCH }}
-        IMAGE_NAME: ${{ inputs.image-name }}
       shell: bash
       run: |
         echo "::group::Load Image"
@@ -411,13 +413,11 @@ runs:
           cat ${{ steps.changelog.outputs.changelog }} >> $GITHUB_STEP_SUMMARY
         fi
 
+        # The image is used by its ID from here on, see the note in the rechunker step
         IMAGE=$(podman pull ${{ steps.rechunk.outputs.ref }})
         sudo rm -rf ${{ steps.rechunk.outputs.location }}
-        podman image tag $IMAGE ${IMAGE_NAME}:${{ env.IMAGE_TAG }}
 
-        IMAGE=${IMAGE_NAME}:${{ env.IMAGE_TAG }}
         INSPECT=$(podman image inspect $IMAGE)
-        echo "image=$IMAGE" >> $GITHUB_OUTPUT
         echo "digest=$(echo "$INSPECT" | jq -r '.[0].Digest')" >> $GITHUB_OUTPUT
         echo "image-id=$(echo "$INSPECT" | jq -r '("sha256:" + .[0].Id)')" >> $GITHUB_OUTPUT
         echo "redhat-id=$(echo "$INSPECT" | jq -r '.[0].Labels["redhat.id"]')" >> $GITHUB_OUTPUT
@@ -435,9 +435,8 @@ runs:
       shell: bash
       run: |
         echo "::group::Push to Registry"
-        podman tag ${{ steps.load.outputs.image-id }} ${{ steps.set-env.outputs.image-ref }}:${{ env.IMAGE_TAG }}
         for i in {1..3}; do
-          podman push --digestfile=/tmp/digestfile ${{ steps.set-env.outputs.image-ref }}:${{ env.IMAGE_TAG }} && break || sleep $((5 * i));
+          podman push --digestfile=/tmp/digestfile ${{ steps.load.outputs.image-id }} docker://${{ steps.set-env.outputs.image-ref }}:${{ env.IMAGE_TAG }} && break || sleep $((5 * i));
         done
         [ -f /tmp/digestfile ] || exit 1
         REMOTE_IMAGE_DIGEST=$(cat /tmp/digestfile)

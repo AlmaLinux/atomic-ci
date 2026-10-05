@@ -6,7 +6,9 @@
 
 # The image to install, as it will be referenced from the installer
 ARG IMAGE_REF
-FROM ${IMAGE_REF}
+# The image to build the live environment from, if it can't be referenced like the one to install
+ARG BASE_IMAGE=${IMAGE_REF}
+FROM ${BASE_IMAGE}
 
 ARG IMAGE_REF
 # The image the installed system gets its updates from, IMAGE_REF if empty
