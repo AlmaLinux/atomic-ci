@@ -245,8 +245,6 @@ jobs:
           image-name: ${{ inputs.image-name }}
           image-path: ${{ inputs.image-path }}
           image-tag: ${{ needs.generate_matrix.outputs.tag }}
-          image-description: ${{ inputs.image-description }}
-          docs-url: ${{ inputs.docs-url }}
           containerfile: ${{ inputs.containerfile }}
           REGISTRY: ${{ inputs.REGISTRY }}
           REGISTRY_USER: ${{ inputs.REGISTRY_USER }}

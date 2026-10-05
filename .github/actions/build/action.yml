@@ -304,6 +304,7 @@ runs:
       env:
         IMAGE_ID: ${{ steps.fix.outputs.image-id }}
         IMAGE_DESCRIPTION: ${{ inputs.image-description }}
+        LICENSE: ${{ github.event.repository.license.spdx_id }}
         LABELED: localhost/${{ inputs.image-name }}:labeled
         RECHUNKED: localhost/${{ inputs.image-name }}:rechunked
         OUT_DIR: /tmp/rechunked
@@ -312,7 +313,12 @@ runs:
         IMAGE_NAME: ${{ inputs.image-name }}
       run: |
         echo "::group::Label Image"
-        # bootc-base-imagectl keeps the labels of the source image, so they need to be set before rechunking
+        # bootc-base-imagectl keeps the labels of the source image, so they need to be set before rechunking.
+        # The manifest action copies these labels to the multi-platform manifest.
+        LICENSE_ARGS=()
+        if [[ -n "${LICENSE}" ]]; then
+          LICENSE_ARGS=(--label "org.opencontainers.image.licenses=${LICENSE}")
+        fi
         mkdir -p /tmp/empty-context
         echo "FROM ${IMAGE_ID#sha256:}" | sudo podman build \
           --platform=linux/${PLATFORM} \
@@ -329,6 +335,7 @@ runs:
           --label "org.opencontainers.image.url=${{ github.event.repository.html_url }}" \
           --label "org.opencontainers.image.vendor=${{ github.repository_owner }}" \
           --label "org.opencontainers.image.version=${{ steps.changelog.outputs.version }}" \
+          "${LICENSE_ARGS[@]}" \
           --label "dev.hhd.rechunk.info=$(cat /tmp/image-info.json)" \
           -t $LABELED \
           -f - \

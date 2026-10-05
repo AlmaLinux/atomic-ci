@@ -15,12 +15,6 @@ inputs:
   image-tag:
     description: The tag for the image
     required: true
-  image-description:
-    description: A description of the image
-    required: true
-  docs-url:
-    description: The URL to the documentation for the image
-    required: true
   containerfile:
     description: The path to the Containerfile used for building the image
     required: true
@@ -96,7 +90,6 @@ runs:
         echo "version=$(echo ${DIGESTS_JSON} | jq -r '[.[] | .version] | unique | .[0]')" >> $GITHUB_OUTPUT
         echo "redhat-version-id=$(echo ${DIGESTS_JSON} | jq -r '[.[] | .redhat_version_id] | unique | .[0]')" >> $GITHUB_OUTPUT
         echo "major-version=$(echo ${DIGESTS_JSON} | jq -r '[.[] | .major_version] | unique | .[0]')" >> $GITHUB_OUTPUT
-        echo "date=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)" >> $GITHUB_OUTPUT
 
     - name: Image Metadata
       uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -106,21 +99,6 @@ runs:
           type=raw,value=${{ inputs.image-tag }}
           type=sha,enable={{is_default_branch}}
           type=ref,event=pr
-        labels: |
-          containers.bootc=1
-          redhat.version-id=${{ steps.check.outputs.redhat-version-id }}
-          redhat.major-version=${{ steps.check.outputs.major-version }}
-          version=${{ steps.check.outputs.redhat-version-id }}
-          release=${{ steps.check.outputs.redhat-version-id }}
-          org.opencontainers.image.version=${{ steps.check.outputs.version }}
-          org.opencontainers.image.created=${{ steps.check.outputs.date }}
-          org.opencontainers.image.description=${{ inputs.image-description }}
-          org.opencontainers.image.documentation=${{ inputs.docs-url }}
-          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-          org.opencontainers.image.revision=${{ github.sha }}
-          org.opencontainers.image.title=${{ inputs.image-name }}
-          org.opencontainers.image.url=${{ github.event.repository.html_url }}
-          org.opencontainers.image.vendor=${{ github.repository_owner }}
 
     - name: Create Manifest
       id: create-manifest
@@ -138,7 +116,7 @@ runs:
       env:
         MANIFEST: ${{ steps.create-manifest.outputs.MANIFEST }}
         DIGESTS_JSON: ${{ steps.load-outputs.outputs.DIGESTS_JSON }}
-        LABELS: ${{ steps.metadata.outputs.labels }}
+        REDHAT_VERSION_ID: ${{ steps.check.outputs.redhat-version-id }}
       shell: bash
       run: |
         for platform in $(echo $DIGESTS_JSON | jq -r '. | to_entries | .[].key'); do
@@ -151,11 +129,17 @@ runs:
           fi
         done
 
-        # Apply the labels to the manifest (separated by newlines)
-        while IFS= read -r label; do
-          echo "Applying label $label to manifest"
+        # Annotate the manifest with the labels of the images, which are the same for all platforms.
+        # Labels specific to an image, like the ostree ones or the list of packages, are left out.
+        digest=$(echo $DIGESTS_JSON | jq -r '[.[].digest] | first')
+        LABELS=$(skopeo inspect --no-tags docker://$MANIFEST@$digest | jq --arg version "$REDHAT_VERSION_ID" '
+          .Labels
+          | with_entries(select(.key | test("^(org\\.opencontainers\\.image\\.|redhat\\.|containers\\.bootc$)")))
+          | . + {version: $version, release: $version}')
+        while IFS= read -r -d '' label; do
+          echo "Applying annotation $label to manifest"
           podman manifest annotate --index --annotation "$label" $MANIFEST
-        done <<< "$LABELS"
+        done < <(echo "$LABELS" | jq -j 'to_entries[] | "\(.key)=\(.value)\u0000"')
 
     - name: Push Manifest
       id: push_manifest

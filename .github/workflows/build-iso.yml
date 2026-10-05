@@ -105,15 +105,8 @@ jobs:
         env:
           PLATFORMS: ${{ inputs.platforms }}
         run: |
-          # turn the comma separated string into a list
-          platforms=()
-          IFS=',' read -r -a platforms <<< "${PLATFORMS}"
-
-          MATRIX="{\"include\":[]}"
-          for platform in "${platforms[@]}"; do
-            MATRIX=$(echo $MATRIX | jq ".include += [{\"platform\": \"$platform\"}]")
-          done
-          echo "matrix=$(echo $MATRIX | jq -c '.')" >> $GITHUB_OUTPUT
+          # Turn the comma separated string into a matrix
+          echo "matrix=$(jq -cn --arg platforms "${PLATFORMS}" '{include: ($platforms | split(",") | map({platform: .}))}')" >> $GITHUB_OUTPUT
 
   build-iso:
     runs-on: ${{ matrix.platform == 'arm64' && 'ubuntu-26.04-arm' || 'ubuntu-26.04' }}
