@@ -41,8 +41,9 @@ for more than its caller grants is rejected as invalid.
 ## Versions
 
 Releases are tagged with a single number (`v11`, `v12`). A new version can require changes in the
-repositories that use it. These are described in the [changelog](CHANGELOG.md), which Dependabot
-also includes in the pull requests it opens to update the version.
+repositories that use it. The [upgrade guide](UPGRADE.md) lists what you need to do, and the [changelog](CHANGELOG.md)
+describes what changed. Dependabot includes both in the pull requests it opens to update the
+version.
 
 ## Workflows
 
@@ -210,7 +211,7 @@ Before submitting code changes, please check if there are any open issues or pul
 
 After review and approval, the changes will be merged and deployed.
 
-Changes that require action from the repositories using these workflows have to be described in the [changelog](CHANGELOG.md).
+Changes that require action from the repositories using these workflows have to be described in the [upgrade guide](UPGRADE.md), with the newest version first and within its first 50 lines, as that is what Dependabot shows. All changes go in the [changelog](CHANGELOG.md).
 
 ## Reporting a Bug
 
