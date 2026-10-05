@@ -320,9 +320,11 @@ runs:
           LICENSE_ARGS=(--label "org.opencontainers.image.licenses=${LICENSE}")
         fi
         mkdir -p /tmp/empty-context
-        echo "FROM ${IMAGE_ID#sha256:}" | sudo podman build \
+        sudo podman build \
           --platform=linux/${PLATFORM} \
           --pull=never \
+          --security-opt=label=disable \
+          --build-arg IMAGE="${IMAGE_ID#sha256:}" \
           --label "redhat.id=${{ steps.check.outputs.redhat-id }}" \
           --label "redhat.version-id=${{ steps.check.outputs.redhat-version-id }}" \
           --label "redhat.major-version=${{ steps.check.outputs.major-version }}" \
@@ -339,7 +341,27 @@ runs:
           --label "dev.hhd.rechunk.info=$(cat /tmp/image-info.json)" \
           -t $LABELED \
           -f - \
-          /tmp/empty-context
+          /tmp/empty-context <<'EOF'
+        ARG IMAGE
+        FROM ${IMAGE}
+
+        # Keep the users and groups of the image in /usr/lib/passwd and /usr/lib/group (read through
+        # nss-altfiles), like the base image does for its own, leaving only root and wheel in /etc.
+        # /etc/passwd and /etc/group stop getting updates from the image as soon as they are modified
+        # in a system, which is always, so users and groups left there never reach installed systems.
+        # hhd-dev/rechunk used to do this, so not doing it would also remove from the systems
+        # installed from older images every user and group that the image adds to its base.
+        RUN <<'EORUN'
+        set -euo pipefail
+        touch /usr/lib/passwd /usr/lib/group
+        { grep -v '^root:' /etc/passwd | grep -vxFf /usr/lib/passwd >> /usr/lib/passwd; } || true
+        { grep -Ev '^(root|wheel):' /etc/group | grep -vxFf /usr/lib/group >> /usr/lib/group; } || true
+        sed -i '/^root:/!d' /etc/passwd
+        sed -i -E '/^(root|wheel):/!d' /etc/group
+        # Lock and backup files left behind by useradd and groupadd
+        rm -f /etc/.pwd.lock /etc/passwd- /etc/group- /etc/shadow- /etc/gshadow- /etc/subuid- /etc/subgid-
+        EORUN
+        EOF
         echo "::endgroup::"
 
         echo "::group::Rechunk Image"
