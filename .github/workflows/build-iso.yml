@@ -83,7 +83,7 @@ on:
         required: false
 
 env:
-  INTERNAL_ACTIONS_REF: dev/v12
+  INTERNAL_ACTIONS_REF: v12.1
 
 jobs:
   generate_matrix:
