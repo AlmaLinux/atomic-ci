@@ -361,6 +361,19 @@ runs:
         # Lock and backup files left behind by useradd and groupadd
         rm -f /etc/.pwd.lock /etc/passwd- /etc/group- /etc/shadow- /etc/gshadow- /etc/subuid- /etc/subgid-
         EORUN
+
+        # Images built with rpm-ostree, like the base image, have a copy of the package database that
+        # rpm-ostree uses to know what the image has. Installing packages on top doesn't update it,
+        # so it would only list the packages of the base image. hhd-dev/rechunk used to refresh it.
+        RUN <<'EORUN'
+        set -euo pipefail
+        RPMDB="$(realpath "$(rpm --eval '%{_dbpath}')")"
+        BASE_RPMDB=/usr/lib/sysimage/rpm-ostree-base-db
+        if [[ -d "${BASE_RPMDB}" && "${RPMDB}" != "${BASE_RPMDB}" ]]; then
+            rm -rf "${BASE_RPMDB}"
+            cp -a "${RPMDB}" "${BASE_RPMDB}"
+        fi
+        EORUN
         EOF
         echo "::endgroup::"
 
