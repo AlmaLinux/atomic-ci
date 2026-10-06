@@ -190,7 +190,7 @@ It has to run in the same workflow run as `build-image.yml`, as it uses the arti
 | Input | Required | Description |
 |---|---|---|
 | `image-name` | yes | Name of the image |
-| `version` | yes | Version of the image, used as the tag of the release |
+| `version` | yes | Version of the image. The release is named and tagged after the highest version in the changelogs, or this one if they have none |
 | `latest-image-ref` | yes | Reference to show in the instructions to switch to the image |
 
 # Contributing
