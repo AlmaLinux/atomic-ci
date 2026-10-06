@@ -127,6 +127,10 @@ echo "Installed from the ISO" > /etc/motd.d/installed
 EOF
 ```
 
+If the ISO build fails, its build log and the manifest it was building are uploaded as an artifact
+of the run, named `iso-build-diagnostics-<image>-<platform>`. The log of a successful build ends
+with the time each stage took.
+
 **Permissions:** `contents: read`, `packages: read`, `id-token: write`
 
 | Input | Required | Default | Description |

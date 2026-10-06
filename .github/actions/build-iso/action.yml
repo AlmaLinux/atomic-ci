@@ -171,6 +171,9 @@ runs:
         mkdir -p "${OUTPUT}"
         # image-builder takes the images by name: the one to install is stored in the ISO under
         # that name, which is how the installer refers to it. It looks them up without a platform.
+        # The manifest and the build log are written to the output directory, and uploaded by the
+        # next step if the build fails. The metrics are the time each stage took, printed at the end.
+        RC=0
         sudo podman run \
           --rm \
           --privileged \
@@ -182,10 +185,18 @@ runs:
           build \
           --progress verbose \
           --output-dir /output \
+          --with-manifest \
+          --with-buildlog \
+          --with-metrics \
           --bootc-ref "${{ steps.live.outputs.live-image }}" \
           --bootc-installer-payload-ref "${IMAGE}" \
-          bootc-generic-iso
+          bootc-generic-iso || RC=$?
+        # Also when the build fails, so the diagnostics can be uploaded
         sudo chown -R "$(id -u):$(id -g)" "${OUTPUT}"
+        if [[ $RC -ne 0 ]]; then
+          echo "::error::The ISO build failed, the build log and the manifest are uploaded as an artifact of this run"
+          exit $RC
+        fi
 
         # Make space for the uploads
         sudo podman rmi -f "${{ steps.live.outputs.live-image-id }}" "${{ steps.live.outputs.image-id }}"
@@ -195,6 +206,17 @@ runs:
         ls -lh "${ISO}"
         echo "output-path=${ISO}" >> "${GITHUB_OUTPUT}"
         echo "::endgroup::"
+
+    - name: Upload ISO build diagnostics
+      if: ${{ failure() && steps.build.outcome == 'failure' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: iso-build-diagnostics-${{ inputs.image-name }}-${{ env.CLEAN_ARCH }}
+        retention-days: 7
+        if-no-files-found: warn
+        path: |
+          ${{ runner.temp }}/iso-output/*.buildlog
+          ${{ runner.temp }}/iso-output/*.osbuild-manifest.json
 
     - name: Rename ISO
       id: rename
