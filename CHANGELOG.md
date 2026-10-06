@@ -1,13 +1,13 @@
 # Changelog
 
-## v12.1
+## v13
 
 ⚠️ **This version has breaking changes.** Your workflows stop working until you make the
 changes in the [upgrade guide](UPGRADE.md).
 
 ### What changed
 
-- Images are rechunked with a different tool (`bootc-base-imagectl rechunk`), so the first update to an image built with v12.1
+- Images are rechunked with a different tool (`bootc-base-imagectl rechunk`), so the first update to an image built with v13
   downloads the whole image again.
 - ISO images are now built with [`image-builder`](https://osbuild.org/docs/developer-guide/projects/image-builder/).
 - ISOs boot into a live session of your image, with an installer that doesn't need a network

@@ -22,7 +22,7 @@ To call a workflow from your own repository:
 ```yaml
 jobs:
   build-image:
-    uses: AlmaLinux/atomic-ci/.github/workflows/build-image.yml@v12
+    uses: AlmaLinux/atomic-ci/.github/workflows/build-image.yml@v13
     with:
       containerfile: Dockerfile
       image-name: my-image
@@ -40,7 +40,7 @@ for more than its caller grants is rejected as invalid.
 
 ## Versions
 
-Releases are tagged with a version (`v11`, `v12`). A new version can require changes in the
+Releases are tagged with a version (`v11`, `v13`). A new version can require changes in the
 repositories that use it. The [upgrade guide](UPGRADE.md) lists what you need to do, and the [changelog](CHANGELOG.md)
 describes what changed. Dependabot includes both in the pull requests it opens to update the
 version.

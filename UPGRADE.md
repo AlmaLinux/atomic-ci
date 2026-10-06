@@ -4,7 +4,7 @@ What you need to change in your repository when you move to a new version. Each 
 the version in [atomic-respin-template](https://github.com/AlmaLinux/atomic-respin-template),
 which you can copy from. The [changelog](CHANGELOG.md) describes what changed and why.
 
-## From v11 to v12.1
+## From v11 to v13
 
 ⚠️ Your workflows stop working until you make changes 1 to 5.
 
