@@ -24,7 +24,7 @@ on:
         type: boolean
         default: false
       platforms:
-        description: "The platforms to build the image for"
+        description: "The platforms to build ISOs for, any of amd64 and arm64"
         required: false
         type: string
         default: "amd64,arm64"

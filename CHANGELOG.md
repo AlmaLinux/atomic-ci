@@ -9,6 +9,7 @@ changes in the [upgrade guide](UPGRADE.md).
 
 - ISOs boot into a live session of your image, with an installer that doesn't need a network
   connection. The installer needs no configuration, so `iso.toml` is gone.
+- ISOs can be built for arm64.
 - Images are rechunked with a different tool, so the first update to an image built with v12
   downloads the whole image again.
 - Images built from any branch are signed, not only the ones from the default branch. Builds of

@@ -23,9 +23,11 @@ In the job that calls `create-release.yml`
 
 5. Remove `pretty-version`.
 
-Not breaking, but do them soon:
+Not breaking:
 
-6. Update [files/scripts/cleanup.sh](https://github.com/AlmaLinux/atomic-respin-template/blob/main/files/scripts/cleanup.sh).
-   The old one breaks `/usr/local` in the image. CI works around it for now, with a warning.
-7. Update the [Makefile](https://github.com/AlmaLinux/atomic-respin-template/blob/main/Makefile),
+6. Update [files/scripts/cleanup.sh](https://github.com/AlmaLinux/atomic-respin-template/blob/main/files/scripts/cleanup.sh)
+   soon. The old one breaks `/usr/local` in the image. CI works around it for now, with a warning.
+7. Add `arm64` to the `platforms` of the job that calls `build-iso.yml`, if you want ISOs for
+   it. This is new.
+8. Update the [Makefile](https://github.com/AlmaLinux/atomic-respin-template/blob/main/Makefile),
    if you build ISOs or disk images locally.

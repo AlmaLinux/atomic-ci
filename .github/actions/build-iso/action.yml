@@ -4,7 +4,7 @@ description: Build a live ISO from a container image, with an installer for that
 
 inputs:
   platform:
-    description: The platform to build the image for (e.g., "x86_64", "arm64")
+    description: The platform to build the ISO for (e.g., "amd64", "arm64")
     required: true
   image:
     description: Full podman image reference, including hash (e.g., "registry.example.com/image@sha256")
