@@ -108,26 +108,24 @@ Builds an ISO for each platform. The ISO boots into a live session of the image,
 for it. The image is included in the ISO, so installing doesn't need a network connection.
 
 The live environment is built on top of the image, and converted to an ISO with
-[image-builder](https://github.com/osbuild/image-builder). The installed system gets its updates
-from `update-origin-ref`.
+[image-builder](https://github.com/osbuild/image-builder).
 
-To add your own kickstart to the installer, set `config-file` to a TOML file like this one. Only the
-kickstart is used from it.
+The installed system gets its updates from `update-origin-ref`. It verifies their signature if the
+`/etc/containers/policy.json` of the image requires one for that image, which is what the template
+sets up when the image is signed.
 
-```toml
-[customizations.installer.kickstart]
-contents = """
+The installer doesn't need any configuration. To change the live environment or the installer, set
+`hook-script` to a script in your repository. It runs at the end of the build of the live
+environment, as root inside it. For example, to run your own steps during the installation, add
+them to the kickstart of the installer:
+
+```bash
+cat >> /usr/share/anaconda/interactive-defaults.ks <<'EOF'
 %post --erroronfail
-bootc switch --mutate-in-place --transport registry <IMAGE_SIGNED> <UPDATE_IMAGE_REF>
+echo "Installed from the ISO" > /etc/motd.d/installed
 %end
-"""
+EOF
 ```
-
-`<UPDATE_IMAGE_REF>` is replaced with `update-origin-ref`. `<IMAGE_SIGNED>` is replaced with
-`--enforce-container-sigpolicy` if `update-is-signed` is set, and removed otherwise.
-
-The installed system only verifies the signature of its updates if the kickstart switches it to a
-signed image like this. Without a kickstart, updates are not verified.
 
 **Permissions:** `contents: read`, `packages: read`, `id-token: write`
 
@@ -136,9 +134,7 @@ signed image like this. Without a kickstart, updates are not verified.
 | `image` | yes | | Reference of the image to install, including tag or digest |
 | `image-name` | yes | | Name of the image, used for the name of the ISO |
 | `update-origin-ref` | no | | Image the installed system gets its updates from (for example `ghcr.io/my-org/my-image:latest`) |
-| `update-is-signed` | no | `true` | Whether the image is signed. Only used for `<IMAGE_SIGNED>` in the kickstart, see above |
-| `config-file` | no | | Path to a TOML file with a kickstart for the installer |
-| `hook-script` | no | | Path to a script that runs at the end of the build of the live environment, to customize it |
+| `hook-script` | no | | Path to a script that runs at the end of the build of the live environment, to customize it or the installer |
 | `platforms` | no | `amd64,arm64` | Comma-separated list of platforms to build |
 | `skip-maximize-build-space` | no | `false` | Don't remove unused software from the runner to make space |
 | `REGISTRY` | no | `ghcr.io` | Registry the image is pulled from |

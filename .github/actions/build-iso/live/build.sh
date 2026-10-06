@@ -5,8 +5,7 @@
 #   IMAGE_REF            Image to install, has to be available in the containers-storage of the live environment
 #   UPDATE_IMAGE_REF     Image the installed system gets its updates from, defaults to IMAGE_REF
 #   ISO_NAME, ISO_LABEL  Boot menu name and volume label
-#   /ctx/kickstart.ks    Optional, additional kickstart for the installer
-#   /ctx/hook.sh         Optional, script to customize the live environment
+#   /ctx/hook.sh         Optional, script to customize the live environment or the installer
 
 set -xeuo pipefail
 
@@ -103,30 +102,17 @@ systemctl enable var-tmp.mount
 ### Installer
 
 # The image is embedded in the ISO by image-builder (--bootc-installer-payload-ref), and installed
-# with `bootc install`
+# with `bootc install`. The installed system gets its updates from UPDATE_IMAGE_REF, and verifies
+# them according to the policy in /etc/containers/policy.json of the image.
 cat >> /usr/share/anaconda/interactive-defaults.ks <<EOKS
 
 bootc --source-imgref containers-storage:${IMAGE_REF} --target-imgref ${UPDATE_IMAGE_REF}
-
-# bootc expects the physical root in /sysroot, like in a booted system. Anaconda doesn't set that
-# up in the installed system, so commands like \`bootc switch\` fail in %post scripts without it
-%post --nochroot --erroronfail
-mount --bind /mnt/sysimage /mnt/sysroot/sysroot
-%end
 EOKS
-if [[ -f /ctx/kickstart.ks ]]; then
-    cat /ctx/kickstart.ks >> /usr/share/anaconda/interactive-defaults.ks
-fi
-cat >> /usr/share/anaconda/interactive-defaults.ks <<EOKS
-
-%post --nochroot
-umount /mnt/sysroot/sysroot
-%end
-EOKS
-cat /usr/share/anaconda/interactive-defaults.ks
 
 ### Customizations
 
 if [[ -f /ctx/hook.sh ]]; then
     bash /ctx/hook.sh
 fi
+
+cat /usr/share/anaconda/interactive-defaults.ks

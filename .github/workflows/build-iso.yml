@@ -14,17 +14,8 @@ on:
         description: "Image reference to update from (ie: {image}:latest)"
         required: false
         type: string
-      update-is-signed:
-        description: "Whether the image is signed or not"
-        required: false
-        type: boolean
-        default: true
-      config-file:
-        description: "Path to the ISO configuration file. Only the kickstart ([customizations.installer.kickstart]) is used, it's added to the kickstart of the installer"
-        required: false
-        type: string
       hook-script:
-        description: "Path to a script that runs at the end of the live image build, to customize the live environment"
+        description: "Path to a script that runs at the end of the live image build, to customize the live environment or the installer"
         required: false
         type: string
       skip-maximize-build-space:
@@ -138,8 +129,6 @@ jobs:
           image: ${{ inputs.image }}
           image-name: ${{ inputs.image-name }}
           update-origin-ref: ${{ inputs.update-origin-ref }}
-          update-is-signed: ${{ inputs.update-is-signed }}
-          config-file: ${{ inputs.config-file }}
           hook-script: ${{ inputs.hook-script }}
           skip-maximize-build-space: ${{ inputs.skip-maximize-build-space }}
           platform: ${{ matrix.platform }}
