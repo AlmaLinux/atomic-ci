@@ -40,7 +40,7 @@ for more than its caller grants is rejected as invalid.
 
 ## Versions
 
-Releases are tagged with a single number (`v11`, `v12`). A new version can require changes in the
+Releases are tagged with a version (`v11`, `v12`). A new version can require changes in the
 repositories that use it. The [upgrade guide](UPGRADE.md) lists what you need to do, and the [changelog](CHANGELOG.md)
 describes what changed. Dependabot includes both in the pull requests it opens to update the
 version.

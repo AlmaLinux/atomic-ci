@@ -43,8 +43,8 @@ jobs:
             done <<< "$REFS"
           fi
 
-          # In a release branch or tag (vN), the ref should be that release
-          if [[ "$RELEASE_REF" =~ ^v[0-9]+$ ]]; then
+          # In a release branch or tag (v12, v12.1), the ref should be that release
+          if [[ "$RELEASE_REF" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then
             while IFS=: read -r file line ref; do
               if [[ "$ref" != "$RELEASE_REF" ]]; then
                 warn "$file" "$line" "INTERNAL_ACTIONS_REF is '$ref', but this is $RELEASE_REF. Was it forgotten?"
