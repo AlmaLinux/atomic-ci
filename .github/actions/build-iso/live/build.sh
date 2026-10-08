@@ -77,6 +77,15 @@ case "${SESSION_FILE}" in
     *) LIVESYS_SESSION="" ;;
 esac
 sed -i "s/^livesys_session=.*/livesys_session=\"${LIVESYS_SESSION}\"/" /etc/sysconfig/livesys
+
+# Partitioning tools, to prepare the disks before installing. GParted isn't packaged for EL10, use
+# the desktop's own tool instead. KDE Partition Manager comes from EPEL, which the image might not
+# have enabled.
+dnf install -y parted
+if [[ "${LIVESYS_SESSION}" != kde ]] || ! dnf install -y kde-partitionmanager; then
+    dnf install -y gnome-disk-utility
+fi
+dnf clean all
 systemctl enable livesys.service livesys-late.service
 
 # The system is not booted from a bootc deployment, so it can't be updated
