@@ -151,6 +151,13 @@ runs:
         # Package list (name -> version-release), used for the changelog and stored in the image labels
         sudo podman run --platform=linux/${PLATFORM} --rm ${{ env.IMAGE_ID }} rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\n' \
           | jq -Rn '[inputs | split("\t") | {key: .[0], value: .[1]}] | reverse | from_entries' > /tmp/packages.json
+
+        # A damaged package database still lists every package, but dependency lookups fail, which
+        # breaks dnf in images built on top of this one.
+        if ! sudo podman run --platform=linux/${PLATFORM} --rm ${{ env.IMAGE_ID }} rpmdb --verifydb; then
+          echo "::error::The package database of the image is corrupted"
+          exit 1
+        fi
         echo "::endgroup::"
 
     # Respins built from older templates run `mv /usr/local /var/usrlocal` on top of a base image
@@ -418,6 +425,8 @@ runs:
     - name: Load Image
       id: load
       shell: bash
+      env:
+        PLATFORM: ${{ inputs.platform }}
       run: |
         echo "::group::Load Image"
         ls -l ${{ steps.changelog.outputs.changelog }}
@@ -429,6 +438,18 @@ runs:
         # The image is used by its ID from here on, see the note in the rechunker step
         IMAGE=$(podman pull ${{ steps.rechunk.outputs.ref }})
         sudo rm -rf ${{ steps.rechunk.outputs.location }}
+
+        # Check the package databases again as they will be published, see the note in the check step
+        if ! podman run --platform=linux/${PLATFORM} --rm $IMAGE bash -c '
+            set -euo pipefail
+            rpmdb --verifydb
+            BASE_RPMDB=/usr/lib/sysimage/rpm-ostree-base-db
+            if [[ -d "${BASE_RPMDB}" ]]; then
+                rpmdb --verifydb --dbpath "${BASE_RPMDB}"
+            fi'; then
+          echo "::error::The package database of the rechunked image is corrupted"
+          exit 1
+        fi
 
         INSPECT=$(podman image inspect $IMAGE)
         echo "digest=$(echo "$INSPECT" | jq -r '.[0].Digest')" >> $GITHUB_OUTPUT
