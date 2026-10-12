@@ -154,7 +154,13 @@ runs:
 
         # A damaged package database still lists every package, but dependency lookups fail, which
         # breaks dnf in images built on top of this one.
-        if ! sudo podman run --platform=linux/${PLATFORM} --rm ${{ env.IMAGE_ID }} rpmdb --verifydb; then
+        # podman exits with 125 or more when the container itself fails to run.
+        RC=0
+        sudo podman run --platform=linux/${PLATFORM} --rm ${{ env.IMAGE_ID }} rpmdb --verifydb || RC=$?
+        if (( RC >= 125 )); then
+          echo "::error::Could not check the package database of the image, the container failed to run"
+          exit 1
+        elif (( RC != 0 )); then
           echo "::error::The package database of the image is corrupted"
           exit 1
         fi
@@ -404,6 +410,26 @@ runs:
         # Move the rechunked image out of root's storage, removing the originals to make space
         # The rechunker can only write to a name, get the ID of what it created
         RECHUNKED_ID=$(sudo podman image inspect --format '{{.Id}}' $RECHUNKED)
+
+        # Check the package databases again as they will be published, see the note in the check step.
+        # This has to run as root: the containers run with sudo leave a container runtime directory
+        # that the runner user can't access, so rootless containers fail to start in this job.
+        RC=0
+        sudo podman run --platform=linux/${PLATFORM} --rm $RECHUNKED_ID bash -c '
+            set -euo pipefail
+            rpmdb --verifydb
+            BASE_RPMDB=/usr/lib/sysimage/rpm-ostree-base-db
+            if [[ -d "${BASE_RPMDB}" ]]; then
+                rpmdb --verifydb --dbpath "${BASE_RPMDB}"
+            fi' || RC=$?
+        if (( RC >= 125 )); then
+          echo "::error::Could not check the package database of the rechunked image, the container failed to run"
+          exit 1
+        elif (( RC != 0 )); then
+          echo "::error::The package database of the rechunked image is corrupted"
+          exit 1
+        fi
+
         sudo podman rmi -f --ignore $LABELED_ID $IMAGE_ID ${{ steps.build.outputs.image-id }}
         sudo skopeo copy --dest-oci-accept-uncompressed-layers containers-storage:$RECHUNKED_ID oci:$OUT_DIR
         sudo podman rmi -f $RECHUNKED_ID
@@ -425,8 +451,6 @@ runs:
     - name: Load Image
       id: load
       shell: bash
-      env:
-        PLATFORM: ${{ inputs.platform }}
       run: |
         echo "::group::Load Image"
         ls -l ${{ steps.changelog.outputs.changelog }}
@@ -438,18 +462,6 @@ runs:
         # The image is used by its ID from here on, see the note in the rechunker step
         IMAGE=$(podman pull ${{ steps.rechunk.outputs.ref }})
         sudo rm -rf ${{ steps.rechunk.outputs.location }}
-
-        # Check the package databases again as they will be published, see the note in the check step
-        if ! podman run --platform=linux/${PLATFORM} --rm $IMAGE bash -c '
-            set -euo pipefail
-            rpmdb --verifydb
-            BASE_RPMDB=/usr/lib/sysimage/rpm-ostree-base-db
-            if [[ -d "${BASE_RPMDB}" ]]; then
-                rpmdb --verifydb --dbpath "${BASE_RPMDB}"
-            fi'; then
-          echo "::error::The package database of the rechunked image is corrupted"
-          exit 1
-        fi
 
         INSPECT=$(podman image inspect $IMAGE)
         echo "digest=$(echo "$INSPECT" | jq -r '.[0].Digest')" >> $GITHUB_OUTPUT

@@ -18,6 +18,8 @@ changes in the [upgrade guide](UPGRADE.md).
 - Builds run on Ubuntu 26.04.
 - New `hook-script` input for `build-iso.yml`, to customize the live environment of the ISO and
   its installer.
+- Builds fail if the package database of the image is corrupted, instead of publishing an image
+  where `dnf` can't install anything on top.
 
 ## v11
 
